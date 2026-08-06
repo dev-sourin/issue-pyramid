@@ -1,0 +1,1247 @@
+<meta charset="utf-8">
+<title>Issue Pyramid — 論点ピラミッド</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<style>
+  :root{
+    --bg:#EEF1F5;
+    --bg-grid: rgba(31,92,130,0.07);
+    --surface:#FFFFFF;
+    --surface-alt:#E1E7EE;
+    --surface-alt-2:#D2DBE4;
+    --ink:#182430;
+    --ink-soft:#5B6B7A;
+    --ink-faint:#8B98A5;
+    --accent:#1F5C82;
+    --accent-strong:#123B57;
+    --accent-contrast:#FFFFFF;
+    --line:#C1CBD5;
+    --danger:#A23B2E;
+    --danger-bg:#F7E7E3;
+    --shadow: 0 1px 2px rgba(20,30,40,0.08), 0 6px 18px rgba(20,30,40,0.08);
+    --radius: 10px;
+    --board-1:#1F5C82;
+    --board-2:#B5502B;
+    --board-3:#4B7A51;
+    --board-4:#7A4B8A;
+    --font-mono: ui-monospace, "SFMono-Regular", Menlo, Consolas, "Liberation Mono", monospace;
+    --font-body: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Hiragino Kaku Gothic ProN", "Hiragino Sans", "Noto Sans JP", sans-serif;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#10151B;
+      --bg-grid: rgba(111,179,222,0.08);
+      --surface:#1B222B;
+      --surface-alt:#222B36;
+      --surface-alt-2:#2B3542;
+      --ink:#E7E9E4;
+      --ink-soft:#9AA7B4;
+      --ink-faint:#69747F;
+      --accent:#6FB3DE;
+      --accent-strong:#9FD0F0;
+      --accent-contrast:#0B1620;
+      --line:#33404D;
+      --danger:#E08A76;
+      --danger-bg:#3A2622;
+      --shadow: 0 1px 2px rgba(0,0,0,0.4), 0 8px 22px rgba(0,0,0,0.4);
+      --board-1:#6FB3DE;
+      --board-2:#E08A5C;
+      --board-3:#8FC496;
+      --board-4:#C6A0DA;
+    }
+  }
+  :root[data-theme="dark"]{
+    --bg:#10151B; --bg-grid: rgba(111,179,222,0.08); --surface:#1B222B; --surface-alt:#222B36;
+    --surface-alt-2:#2B3542; --ink:#E7E9E4; --ink-soft:#9AA7B4; --ink-faint:#69747F;
+    --accent:#6FB3DE; --accent-strong:#9FD0F0; --accent-contrast:#0B1620; --line:#33404D;
+    --danger:#E08A76; --danger-bg:#3A2622;
+    --shadow: 0 1px 2px rgba(0,0,0,0.4), 0 8px 22px rgba(0,0,0,0.4);
+    --board-1:#6FB3DE; --board-2:#E08A5C; --board-3:#8FC496; --board-4:#C6A0DA;
+  }
+  :root[data-theme="light"]{
+    --bg:#EEF1F5; --bg-grid: rgba(31,92,130,0.07); --surface:#FFFFFF; --surface-alt:#E1E7EE;
+    --surface-alt-2:#D2DBE4; --ink:#182430; --ink-soft:#5B6B7A; --ink-faint:#8B98A5;
+    --accent:#1F5C82; --accent-strong:#123B57; --accent-contrast:#FFFFFF; --line:#C1CBD5;
+    --danger:#A23B2E; --danger-bg:#F7E7E3;
+    --shadow: 0 1px 2px rgba(20,30,40,0.08), 0 6px 18px rgba(20,30,40,0.08);
+    --board-1:#1F5C82; --board-2:#B5502B; --board-3:#4B7A51; --board-4:#7A4B8A;
+  }
+
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  html,body{height:100%;}
+  body{
+    margin:0; background:var(--bg); color:var(--ink); font-family:var(--font-body);
+    overscroll-behavior:none; -webkit-font-smoothing:antialiased;
+  }
+  button{font-family:inherit;}
+  textarea{font-family:inherit;}
+
+  #app{
+    position:fixed; inset:0; display:flex; flex-direction:column;
+    padding-top:env(safe-area-inset-top); padding-bottom:env(safe-area-inset-bottom);
+  }
+
+  /* ---------- Header / brand + board tabs ---------- */
+  #topbar{
+    display:flex; align-items:center; gap:10px; padding:10px 12px 8px;
+    background:var(--bg); border-bottom:1px solid var(--line);
+  }
+  #brand{
+    font-family:var(--font-mono); font-size:10px; letter-spacing:.09em; color:var(--ink-faint);
+    text-transform:uppercase; white-space:nowrap; writing-mode:vertical-rl; display:none;
+  }
+  #boardTabs{
+    display:flex; gap:6px; overflow-x:auto; scrollbar-width:none; flex:1; padding-bottom:2px;
+  }
+  #boardTabs::-webkit-scrollbar{display:none;}
+  .tab{
+    display:flex; align-items:center; gap:6px; padding:7px 12px; border-radius:999px;
+    background:var(--surface-alt); border:1px solid transparent; white-space:nowrap;
+    font-size:13px; color:var(--ink-soft); flex:0 0 auto; cursor:pointer;
+  }
+  .tab .dot{width:7px;height:7px;border-radius:50%;flex:0 0 auto;}
+  .tab.active{background:var(--surface); border-color:var(--line); color:var(--ink); font-weight:600; box-shadow:var(--shadow);}
+  .tab-add{
+    flex:0 0 auto; width:32px; height:32px; border-radius:50%; border:1px dashed var(--line);
+    background:transparent; color:var(--ink-soft); font-size:16px; display:flex; align-items:center; justify-content:center;
+    cursor:pointer;
+  }
+
+  /* ---------- Toolbar ---------- */
+  #toolbar{
+    display:flex; align-items:center; justify-content:space-between; gap:8px; flex-wrap:wrap;
+    padding:8px 12px; background:var(--bg); border-bottom:1px solid var(--line);
+  }
+  .segmented{
+    display:flex; background:var(--surface-alt); border-radius:999px; padding:3px; gap:2px; flex:0 0 auto;
+  }
+  .segmented button{
+    border:none; background:transparent; padding:6px 10px; border-radius:999px; font-size:12px;
+    color:var(--ink-soft); cursor:pointer; white-space:nowrap;
+  }
+  .segmented button.active{background:var(--surface); color:var(--ink); font-weight:600; box-shadow:var(--shadow);}
+  #pyramidTools{display:flex; align-items:center; gap:4px;}
+  #pyramidTools.hidden{display:none;}
+  .icon-btn{
+    width:32px; height:32px; border-radius:8px; border:1px solid var(--line); background:var(--surface);
+    color:var(--ink-soft); display:flex; align-items:center; justify-content:center; cursor:pointer;
+  }
+  .icon-btn.active{background:var(--accent); color:var(--accent-contrast); border-color:var(--accent);}
+  .icon-btn svg{width:16px;height:16px;}
+
+  /* ---------- Main viewport ---------- */
+  main#viewport{flex:1; min-height:0; position:relative;}
+  section{position:absolute; inset:0; overflow:auto;}
+  .hidden{display:none !important;}
+
+  /* ---------- Outline view ---------- */
+  #outlineView{background:var(--bg); padding:10px 10px 96px;}
+  .hint{
+    margin:6px 4px 14px; padding:12px 14px; border:1px dashed var(--line); border-radius:var(--radius);
+    color:var(--ink-soft); font-size:13px; line-height:1.6;
+  }
+  .row{
+    display:flex; align-items:flex-start; gap:6px; margin-bottom:6px; position:relative;
+  }
+  .row .indent-guides{flex:0 0 auto; display:flex; align-self:stretch;}
+  .row .indent-guides i{width:18px; border-right:1px solid var(--line); margin-right:0; opacity:.6;}
+  .row .card{
+    flex:1; display:flex; align-items:flex-start; gap:6px; background:var(--surface);
+    border:1px solid var(--line); border-left:3px solid var(--lvl,var(--accent));
+    border-radius:var(--radius); padding:8px 6px 8px 10px; box-shadow:var(--shadow);
+  }
+  .row.root .card{border-left-color:var(--accent-strong); background:var(--surface-alt);}
+  .row .handle{
+    flex:0 0 auto; width:22px; height:32px; display:flex; align-items:center; justify-content:center;
+    color:var(--ink-faint); cursor:grab; touch-action:none;
+  }
+  .row .handle svg{width:14px;height:14px;}
+  .row textarea{
+    flex:1; border:none; background:transparent; resize:none; color:var(--ink); font-size:14.5px;
+    line-height:1.5; padding:5px 2px; outline:none; overflow:hidden; min-height:30px;
+  }
+  .row .lvl-badge{
+    font-family:var(--font-mono); font-size:9.5px; letter-spacing:.03em; color:var(--ink-faint);
+    padding-top:8px; flex:0 0 auto;
+  }
+  .row .menu-btn{
+    flex:0 0 auto; width:28px; height:32px; display:flex; align-items:center; justify-content:center;
+    border:none; background:transparent; color:var(--ink-faint); cursor:pointer;
+  }
+  .row .menu-btn svg{width:16px;height:16px;}
+  .row.dragging{opacity:.4;}
+  .row.drop-before .card{box-shadow: inset 0 2px 0 var(--accent), var(--shadow);}
+  .row.drop-after .card{box-shadow: inset 0 -2px 0 var(--accent), var(--shadow);}
+
+  /* ---------- Popover menu ---------- */
+  #popoverBackdrop{position:fixed; inset:0; z-index:40;}
+  #popover{
+    position:fixed; z-index:41; background:var(--surface); border:1px solid var(--line);
+    border-radius:12px; box-shadow:var(--shadow); overflow:hidden; min-width:172px;
+  }
+  #popover button{
+    display:flex; align-items:center; gap:10px; width:100%; padding:11px 14px; border:none;
+    background:transparent; color:var(--ink); font-size:13.5px; text-align:left; cursor:pointer;
+    border-bottom:1px solid var(--line);
+  }
+  #popover button:last-child{border-bottom:none;}
+  #popover button svg{width:15px;height:15px; color:var(--ink-soft); flex:0 0 auto;}
+  #popover button.danger{color:var(--danger);}
+  #popover button.danger svg{color:var(--danger);}
+  #popover button:disabled{opacity:.35; cursor:default;}
+
+  /* ---------- Pyramid view ---------- */
+  #pyramidView{background:var(--bg);
+    background-image:
+      linear-gradient(var(--bg-grid) 1px, transparent 1px),
+      linear-gradient(90deg, var(--bg-grid) 1px, transparent 1px);
+    background-size:22px 22px;
+    touch-action:none;
+  }
+  #pyramidCanvasWrap{position:absolute; top:0; left:0; transform-origin:0 0;}
+  #pyramidSvg{position:absolute; top:0; left:0; overflow:visible;}
+  #pyramidSvg line{stroke:var(--ink-faint); stroke-width:1.5;}
+  #pyramidSvg .mece-arrow{stroke:var(--accent); stroke-width:1.2; fill:none; opacity:.55;}
+  #pyramidSvg text.mece-label{
+    font-family:var(--font-mono); font-size:8px; fill:var(--accent); opacity:.8;
+  }
+  #pyramidNodes{position:absolute; top:0; left:0;}
+  .pnode{
+    position:absolute; background:var(--surface); border:1px solid var(--line);
+    border-top:3px solid var(--lvl,var(--accent)); border-radius:8px; box-shadow:var(--shadow);
+    padding:8px 9px; font-size:12px; line-height:1.4; color:var(--ink); overflow:hidden;
+    display:flex; align-items:center; justify-content:center; text-align:center; cursor:pointer;
+  }
+  .pnode.root{border-top-color:var(--accent-strong); font-weight:600; background:var(--surface-alt);}
+  .pnode .empty{color:var(--ink-faint); font-style:italic;}
+  .pnode.link-src{outline:2px solid var(--accent); outline-offset:2px;}
+  .pnode.link-hover{outline:2px dashed var(--accent); outline-offset:2px;}
+
+  #pyramidHint{
+    position:absolute; left:12px; top:12px; z-index:5; background:var(--surface); border:1px solid var(--line);
+    border-radius:8px; padding:8px 12px; font-size:12px; color:var(--ink-soft); box-shadow:var(--shadow);
+    max-width:min(78vw,320px);
+  }
+
+  /* ---------- Compare view ---------- */
+  #compareView{background:var(--bg); padding:10px 10px 40px;}
+  #compareChips{display:flex; flex-wrap:wrap; gap:6px; margin-bottom:12px;}
+  .chip{
+    display:flex; align-items:center; gap:6px; padding:6px 12px; border-radius:999px;
+    border:1px solid var(--line); background:var(--surface); font-size:12.5px; color:var(--ink-soft); cursor:pointer;
+  }
+  .chip .dot{width:7px;height:7px;border-radius:50%;}
+  .chip.on{background:var(--surface-alt); color:var(--ink); font-weight:600; border-color:var(--ink-faint);}
+  .compare-empty{padding:30px 10px; text-align:center; color:var(--ink-soft); font-size:13px; line-height:1.7;}
+  .compare-card{
+    background:var(--surface); border:1px solid var(--line); border-radius:var(--radius);
+    margin-bottom:14px; overflow:hidden; box-shadow:var(--shadow);
+  }
+  .compare-card .ch{
+    display:flex; align-items:center; gap:8px; padding:10px 12px; border-bottom:1px solid var(--line);
+    cursor:pointer;
+  }
+  .compare-card .ch .dot{width:9px;height:9px;border-radius:50%;flex:0 0 auto;}
+  .compare-card .ch .name{font-weight:600; font-size:13.5px; flex:1;}
+  .compare-card .ch .open{font-family:var(--font-mono); font-size:10px; color:var(--ink-faint); letter-spacing:.05em;}
+  .compare-canvas{position:relative; overflow:hidden;}
+
+  /* ---------- FAB ---------- */
+  #fab{
+    position:absolute; right:16px; bottom:calc(16px + env(safe-area-inset-bottom));
+    width:52px; height:52px; border-radius:50%; background:var(--accent); color:var(--accent-contrast);
+    border:none; box-shadow:var(--shadow); font-size:26px; display:flex; align-items:center; justify-content:center;
+    cursor:pointer; z-index:10;
+  }
+  #fab svg{width:22px;height:22px;}
+
+  /* ---------- Modal ---------- */
+  #modalBackdrop{
+    position:fixed; inset:0; background:rgba(10,14,18,.42); z-index:50; display:flex; align-items:flex-end;
+  }
+  #modalBackdrop.center{align-items:center; justify-content:center;}
+  #modal{
+    background:var(--surface); width:100%; border-radius:16px 16px 0 0; padding:18px 18px calc(18px + env(safe-area-inset-bottom));
+    box-shadow:var(--shadow);
+  }
+  #modalBackdrop.center #modal{width:min(92vw,360px); border-radius:14px;}
+  #modal h3{margin:0 0 12px; font-size:15px;}
+  #modal input[type=text]{
+    width:100%; padding:10px 12px; border:1px solid var(--line); border-radius:8px; background:var(--bg);
+    color:var(--ink); font-size:14px; margin-bottom:14px;
+  }
+  #modal .row-btns{display:flex; gap:8px; justify-content:flex-end;}
+  #modal button{
+    padding:9px 16px; border-radius:8px; border:1px solid var(--line); background:var(--surface-alt);
+    color:var(--ink); font-size:13.5px; cursor:pointer;
+  }
+  #modal button.primary{background:var(--accent); color:var(--accent-contrast); border-color:var(--accent);}
+  #modal button.danger{background:var(--danger-bg); color:var(--danger); border-color:var(--danger-bg);}
+  #modal p{font-size:13.5px; color:var(--ink-soft); line-height:1.6; margin:0 0 16px;}
+  #modal textarea.outdump{
+    width:100%; height:160px; border:1px solid var(--line); border-radius:8px; background:var(--bg);
+    color:var(--ink); font-family:var(--font-mono); font-size:11.5px; padding:10px; margin-bottom:12px;
+  }
+
+  #toast{
+    position:fixed; left:50%; bottom:calc(90px + env(safe-area-inset-bottom)); transform:translateX(-50%);
+    background:var(--ink); color:var(--bg); padding:9px 16px; border-radius:999px; font-size:12.5px;
+    box-shadow:var(--shadow); z-index:60; opacity:0; pointer-events:none; transition:opacity .2s, transform .2s;
+  }
+  #toast.show{opacity:1; transform:translateX(-50%) translateY(-4px);}
+
+  @media (min-width:640px){
+    #brand{display:flex; align-items:center; justify-content:center;}
+  }
+</style>
+
+<div id="app">
+  <header id="topbar">
+    <div id="boardTabs"></div>
+    <button class="tab-add" id="addBoardBtn" title="新しいピラミッド">+</button>
+  </header>
+  <div id="toolbar">
+    <div class="segmented" id="viewSwitch">
+      <button data-view="outline" class="active">アウトライン</button>
+      <button data-view="pyramid">ピラミッド</button>
+      <button data-view="compare">比較</button>
+    </div>
+    <div id="pyramidTools" class="hidden">
+      <button class="icon-btn" id="linkModeBtn" title="要素を線でつなぐ"></button>
+      <button class="icon-btn" id="meceBtn" title="MECEガイド"></button>
+      <button class="icon-btn" id="zoomOutBtn" title="縮小"></button>
+      <button class="icon-btn" id="zoomInBtn" title="拡大"></button>
+      <button class="icon-btn" id="zoomResetBtn" title="全体表示"></button>
+    </div>
+  </div>
+  <main id="viewport">
+    <section id="outlineView"></section>
+    <section id="pyramidView" class="hidden">
+      <div id="pyramidHint" class="hidden"></div>
+      <div id="pyramidCanvasWrap">
+        <svg id="pyramidSvg"></svg>
+        <div id="pyramidNodes"></div>
+      </div>
+    </section>
+    <section id="compareView" class="hidden"></section>
+  </main>
+  <button id="fab" title="サブイシューを追加"></button>
+</div>
+
+<div id="toast"></div>
+
+<script>
+(function(){
+"use strict";
+
+var ICONS = {
+  plus:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>',
+  trash:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M9 7V4.5A1.5 1.5 0 0 1 10.5 3h3A1.5 1.5 0 0 1 15 4.5V7M6 7l1 13a2 2 0 0 0 2 1.9h6a2 2 0 0 0 2-1.9l1-13"/></svg>',
+  indent:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h16M4 12h9M4 19h16M14 9l4 3-4 3"/></svg>',
+  outdent:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h16M4 12h9M4 19h16M18 9l-4 3 4 3"/></svg>',
+  up:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V6M6 11l6-6 6 6"/></svg>',
+  down:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v13M6 13l6 6 6-6"/></svg>',
+  dots:'<svg viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="19" cy="12" r="1.8"/></svg>',
+  handle:'<svg viewBox="0 0 24 24" fill="currentColor"><circle cx="8" cy="6" r="1.6"/><circle cx="16" cy="6" r="1.6"/><circle cx="8" cy="12" r="1.6"/><circle cx="16" cy="12" r="1.6"/><circle cx="8" cy="18" r="1.6"/><circle cx="16" cy="18" r="1.6"/></svg>',
+  edit:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>',
+  link:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 15l6-6M10 6l1-1a3.5 3.5 0 0 1 5 5l-1 1M14 18l-1 1a3.5 3.5 0 0 1-5-5l1-1"/></svg>',
+  mece:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M3 12h6M21 12h-6M9 12l2-2M9 12l2 2M15 12l-2-2M15 12l-2 2"/></svg>',
+  zoomIn:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3M11 8v6M8 11h6"/></svg>',
+  zoomOut:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3M8 11h6"/></svg>',
+  fit:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3M16 3h3a2 2 0 0 1 2 2v3M8 21H5a2 2 0 0 1-2-2v-3M16 21h3a2 2 0 0 0 2-2v-3"/></svg>',
+  copy:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v1"/></svg>'
+};
+
+var STORAGE_KEY = "issue-pyramid-v1";
+var storageOK = true;
+try{ var t="__t"; localStorage.setItem(t,"1"); localStorage.removeItem(t); }catch(e){ storageOK=false; }
+
+var BOARD_COLORS = ["--board-1","--board-2","--board-3","--board-4"];
+var LEVEL_COLORS_LIGHT = ["#123B57","#1F5C82","#3E82A8","#7BA9C4"];
+
+function uid(){ return Math.random().toString(36).slice(2,10) + Date.now().toString(36).slice(-4); }
+
+function newBoard(name, colorIdx){
+  var rootId = uid();
+  var b = { id: uid(), name: name, colorIdx: (colorIdx||0)%BOARD_COLORS.length, rootId: rootId, nodes:{} };
+  b.nodes[rootId] = { id: rootId, text:"", parentId:null, order:0 };
+  return b;
+}
+
+function defaultState(){
+  var s = { boards: [], activeBoardId:null, compareIds:[], viewByBoard:{} };
+  var b = newBoard("ピラミッド 1");
+  b.nodes[b.rootId].text = "検討したいイシュー";
+  s.boards.push(b);
+  s.activeBoardId = b.id;
+  return s;
+}
+
+var state = load();
+
+function load(){
+  if(!storageOK) return defaultState();
+  try{
+    var raw = localStorage.getItem(STORAGE_KEY);
+    if(!raw) return defaultState();
+    var parsed = JSON.parse(raw);
+    if(!parsed || !parsed.boards || !parsed.boards.length) return defaultState();
+    if(!parsed.viewByBoard) parsed.viewByBoard = {};
+    if(!parsed.compareIds) parsed.compareIds = [];
+    return parsed;
+  }catch(e){ return defaultState(); }
+}
+
+var saveTimer=null;
+function save(){
+  if(!storageOK) return;
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(function(){
+    try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }catch(e){}
+  }, 150);
+}
+
+function activeBoard(){
+  var b = state.boards.find(function(x){return x.id===state.activeBoardId;});
+  return b || state.boards[0];
+}
+function boardById(id){ return state.boards.find(function(x){return x.id===id;}); }
+
+function children(board, nodeId){
+  var out=[];
+  for(var k in board.nodes){ if(board.nodes[k].parentId===nodeId) out.push(board.nodes[k]); }
+  out.sort(function(a,b){return a.order-b.order;});
+  return out;
+}
+function depthOf(board, nodeId){
+  var d=0, cur=board.nodes[nodeId];
+  while(cur && cur.parentId){ d++; cur = board.nodes[cur.parentId]; }
+  return d;
+}
+function isDescendant(board, ancestorId, nodeId){
+  var cur = board.nodes[nodeId];
+  while(cur && cur.parentId){
+    if(cur.parentId===ancestorId) return true;
+    cur = board.nodes[cur.parentId];
+  }
+  return false;
+}
+function normalizeOrders(board, parentId){
+  var kids = children(board, parentId);
+  kids.forEach(function(k,i){ k.order=i; });
+}
+function addNode(board, parentId, text){
+  var id = uid();
+  var kids = children(board, parentId);
+  board.nodes[id] = { id:id, text:text||"", parentId:parentId, order:kids.length };
+  return id;
+}
+function deleteNode(board, nodeId){
+  if(nodeId===board.rootId) return;
+  var node = board.nodes[nodeId];
+  if(!node) return;
+  var parentId = node.parentId;
+  var toRemove=[nodeId];
+  var i=0;
+  while(i<toRemove.length){
+    children(board, toRemove[i]).forEach(function(c){toRemove.push(c.id);});
+    i++;
+  }
+  toRemove.forEach(function(id){ delete board.nodes[id]; });
+  normalizeOrders(board, parentId);
+}
+function moveNode(board, nodeId, newParentId, index){
+  var node = board.nodes[nodeId];
+  var oldParentId = node.parentId;
+  node.parentId = newParentId;
+  var kids = children(board, newParentId).filter(function(k){return k.id!==nodeId;});
+  if(index==null) index = kids.length;
+  index = Math.max(0, Math.min(index, kids.length));
+  kids.splice(index,0,node);
+  kids.forEach(function(k,i){k.order=i;});
+  if(oldParentId!==newParentId) normalizeOrders(board, oldParentId);
+}
+function indentNode(board, nodeId){
+  var node = board.nodes[nodeId];
+  var sibs = children(board, node.parentId);
+  var idx = sibs.findIndex(function(s){return s.id===nodeId;});
+  if(idx<=0) return false;
+  var newParent = sibs[idx-1].id;
+  moveNode(board, nodeId, newParent, children(board,newParent).length);
+  return true;
+}
+function outdentNode(board, nodeId){
+  var node = board.nodes[nodeId];
+  var parent = board.nodes[node.parentId];
+  if(!parent || !parent.parentId) return false;
+  var grandId = parent.parentId;
+  var parentIdxAmongSibs = children(board, grandId).findIndex(function(s){return s.id===parent.id;});
+  moveNode(board, nodeId, grandId, parentIdxAmongSibs+1);
+  return true;
+}
+function moveSwap(board, nodeId, dir){
+  var node = board.nodes[nodeId];
+  var sibs = children(board, node.parentId);
+  var idx = sibs.findIndex(function(s){return s.id===nodeId;});
+  var j = idx+dir;
+  if(j<0||j>=sibs.length) return false;
+  var tmp = sibs[idx].order; sibs[idx].order=sibs[j].order; sibs[j].order=tmp;
+  return true;
+}
+function flatten(board){
+  var out=[];
+  function visit(id, depth){
+    out.push({id:id, depth:depth});
+    children(board,id).forEach(function(c){visit(c.id, depth+1);});
+  }
+  visit(board.rootId,0);
+  return out;
+}
+
+/* ---------------- Layout for pyramid ---------------- */
+var CARD_W=138, CARD_H=58, GAP_X=20, GAP_Y=46;
+function layoutBoard(board){
+  var pos={}, counter=0, maxDepth=0;
+  function visit(id, depth){
+    maxDepth=Math.max(maxDepth,depth);
+    var kids = children(board,id);
+    if(!kids.length){
+      pos[id]={x:counter*(CARD_W+GAP_X), depth:depth};
+      counter++;
+    } else {
+      kids.forEach(function(k){visit(k.id, depth+1);});
+      var xs = kids.map(function(k){return pos[k.id].x;});
+      pos[id]={x:(Math.min.apply(null,xs)+Math.max.apply(null,xs))/2, depth:depth};
+    }
+  }
+  visit(board.rootId,0);
+  var width = Math.max(counter*(CARD_W+GAP_X)-GAP_X, CARD_W);
+  var height = (maxDepth+1)*(CARD_H+GAP_Y)-GAP_Y;
+  return {pos:pos, width:width, height:height, maxDepth:maxDepth};
+}
+
+/* ================= Rendering ================= */
+var els = {
+  boardTabs: document.getElementById("boardTabs"),
+  addBoardBtn: document.getElementById("addBoardBtn"),
+  viewSwitch: document.getElementById("viewSwitch"),
+  pyramidTools: document.getElementById("pyramidTools"),
+  outlineView: document.getElementById("outlineView"),
+  pyramidView: document.getElementById("pyramidView"),
+  compareView: document.getElementById("compareView"),
+  pyramidCanvasWrap: document.getElementById("pyramidCanvasWrap"),
+  pyramidSvg: document.getElementById("pyramidSvg"),
+  pyramidNodes: document.getElementById("pyramidNodes"),
+  pyramidHint: document.getElementById("pyramidHint"),
+  fab: document.getElementById("fab"),
+  linkModeBtn: document.getElementById("linkModeBtn"),
+  meceBtn: document.getElementById("meceBtn"),
+  zoomInBtn: document.getElementById("zoomInBtn"),
+  zoomOutBtn: document.getElementById("zoomOutBtn"),
+  zoomResetBtn: document.getElementById("zoomResetBtn"),
+  toast: document.getElementById("toast")
+};
+els.fab.innerHTML = ICONS.plus;
+els.linkModeBtn.innerHTML = ICONS.link;
+els.meceBtn.innerHTML = ICONS.mece;
+els.zoomInBtn.innerHTML = ICONS.zoomIn;
+els.zoomOutBtn.innerHTML = ICONS.zoomOut;
+els.zoomResetBtn.innerHTML = ICONS.fit;
+
+var currentView = "outline";
+var linkMode = false;
+var linkSrc = null;
+var meceOn = false;
+var pyramidTx = {scale:1, x:16, y:16};
+var toastTimer=null;
+function toast(msg){
+  els.toast.textContent = msg;
+  els.toast.classList.add("show");
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(function(){els.toast.classList.remove("show");},1800);
+}
+
+function render(){
+  renderTabs();
+  renderToolbarState();
+  if(currentView==="outline") renderOutline();
+  else if(currentView==="pyramid") renderPyramid();
+  else renderCompare();
+  save();
+}
+
+function renderTabs(){
+  els.boardTabs.innerHTML="";
+  state.boards.forEach(function(b){
+    var t=document.createElement("div");
+    t.className="tab"+(b.id===state.activeBoardId?" active":"");
+    var dot=document.createElement("span");
+    dot.className="dot";
+    dot.style.background="var("+BOARD_COLORS[b.colorIdx%BOARD_COLORS.length]+")";
+    var label=document.createElement("span");
+    label.textContent = b.name || "無題";
+    t.appendChild(dot); t.appendChild(label);
+    t.addEventListener("click", function(){
+      state.activeBoardId=b.id; linkMode=false; linkSrc=null; render();
+    });
+    var LONG_MS=480, timer=null, moved=false, sx=0, sy=0;
+    t.addEventListener("pointerdown", function(ev){
+      moved=false; sx=ev.clientX; sy=ev.clientY;
+      timer=setTimeout(function(){ openBoardMenu(b); },LONG_MS);
+    });
+    t.addEventListener("pointermove", function(ev){
+      if(Math.abs(ev.clientX-sx)>8||Math.abs(ev.clientY-sy)>8){moved=true; clearTimeout(timer);}
+    });
+    t.addEventListener("pointerup", function(){ clearTimeout(timer); });
+    t.addEventListener("pointerleave", function(){ clearTimeout(timer); });
+    els.boardTabs.appendChild(t);
+  });
+}
+
+function openBoardMenu(b){
+  showModal({
+    title: "「"+(b.name||"無題")+"」",
+    body: function(wrap){
+      var input=document.createElement("input");
+      input.type="text"; input.value=b.name; wrap.appendChild(input);
+      return {getName:function(){return input.value;}};
+    },
+    buttons:[
+      {label:"複製", onClick:function(ctx){ duplicateBoard(b); closeModal(); }},
+      {label:"削除", cls:"danger", onClick:function(ctx){
+        if(state.boards.length<=1){ toast("最後の1枚は削除できません"); closeModal(); return; }
+        closeModal();
+        showConfirm("「"+(b.name||"無題")+"」を削除しますか？元に戻せません。", function(){
+          state.boards = state.boards.filter(function(x){return x.id!==b.id;});
+          state.compareIds = state.compareIds.filter(function(id){return id!==b.id;});
+          if(state.activeBoardId===b.id) state.activeBoardId=state.boards[0].id;
+          render();
+        });
+      }},
+      {label:"保存", cls:"primary", onClick:function(ctx){ b.name=ctx.getName()||"無題"; closeModal(); render(); }}
+    ]
+  });
+}
+function duplicateBoard(b){
+  var copy = JSON.parse(JSON.stringify(b));
+  copy.id = uid();
+  copy.name = b.name + " のコピー";
+  copy.colorIdx = state.boards.length % BOARD_COLORS.length;
+  var idMap={};
+  var newNodes={};
+  Object.keys(copy.nodes).forEach(function(oldId){ idMap[oldId]=uid(); });
+  Object.keys(copy.nodes).forEach(function(oldId){
+    var n = copy.nodes[oldId];
+    var nid = idMap[oldId];
+    newNodes[nid] = { id:nid, text:n.text, order:n.order, parentId: n.parentId?idMap[n.parentId]:null };
+  });
+  copy.nodes = newNodes;
+  copy.rootId = idMap[b.rootId];
+  state.boards.push(copy);
+  state.activeBoardId = copy.id;
+  render();
+}
+
+els.addBoardBtn.addEventListener("click", function(){
+  showModal({
+    title:"新しいピラミッド",
+    body:function(wrap){
+      var input=document.createElement("input");
+      input.type="text"; input.placeholder="例）新規事業の論点";
+      input.value = "ピラミッド "+(state.boards.length+1);
+      wrap.appendChild(input);
+      setTimeout(function(){input.focus(); input.select();},50);
+      return {getName:function(){return input.value;}};
+    },
+    buttons:[
+      {label:"キャンセル", onClick:function(){closeModal();}},
+      {label:"作成", cls:"primary", onClick:function(ctx){
+        var b = newBoard(ctx.getName()||("ピラミッド "+(state.boards.length+1)), state.boards.length);
+        state.boards.push(b);
+        state.activeBoardId = b.id;
+        closeModal(); render();
+      }}
+    ]
+  });
+});
+
+function renderToolbarState(){
+  Array.prototype.forEach.call(els.viewSwitch.children, function(btn){
+    btn.classList.toggle("active", btn.dataset.view===currentView);
+  });
+  els.outlineView.classList.toggle("hidden", currentView!=="outline");
+  els.pyramidView.classList.toggle("hidden", currentView!=="pyramid");
+  els.compareView.classList.toggle("hidden", currentView!=="compare");
+  els.pyramidTools.classList.toggle("hidden", currentView!=="pyramid");
+  els.fab.classList.toggle("hidden", currentView==="compare");
+  els.linkModeBtn.classList.toggle("active", linkMode);
+  els.meceBtn.classList.toggle("active", meceOn);
+}
+els.viewSwitch.addEventListener("click", function(ev){
+  var btn = ev.target.closest("button");
+  if(!btn) return;
+  currentView = btn.dataset.view;
+  linkMode=false; linkSrc=null;
+  render();
+});
+
+/* ---------------- Outline view ---------------- */
+function levelColor(depth){
+  return LEVEL_COLORS_LIGHT[Math.min(depth, LEVEL_COLORS_LIGHT.length-1)];
+}
+
+var dragState = null;
+
+function renderOutline(){
+  var board = activeBoard();
+  var flat = flatten(board);
+  var wrap = document.createDocumentFragment();
+
+  if(flat.length===1){
+    var hint = document.createElement("div");
+    hint.className="hint";
+    hint.textContent = "右下の + から、最初のサブイシューを追加しましょう。各行の「…」から、追加・インデント・削除などができます。";
+    wrap.appendChild(hint);
+  }
+
+  flat.forEach(function(item){
+    var node = board.nodes[item.id];
+    var isRoot = item.id===board.rootId;
+    var row = document.createElement("div");
+    row.className = "row"+(isRoot?" root":"");
+    row.dataset.id = item.id;
+
+    var guides = document.createElement("div");
+    guides.className="indent-guides";
+    for(var i=0;i<item.depth;i++){ var g=document.createElement("i"); guides.appendChild(g); }
+    row.appendChild(guides);
+
+    var card = document.createElement("div");
+    card.className="card";
+    card.style.setProperty("--lvl", levelColor(item.depth));
+
+    if(!isRoot){
+      var handle=document.createElement("div");
+      handle.className="handle";
+      handle.innerHTML=ICONS.handle;
+      handle.dataset.role="handle";
+      card.appendChild(handle);
+    }
+
+    var ta = document.createElement("textarea");
+    ta.rows=1;
+    ta.value = node.text;
+    ta.placeholder = isRoot ? "検討したい主イシューを入力" : (item.depth===1?"サブイシュー":"サブサブイシュー / 仮説 / アクション");
+    ta.addEventListener("input", function(){
+      node.text = ta.value;
+      autoGrow(ta);
+      save();
+      if(!isRoot){ syncBoardTabName(); }
+    });
+    ta.addEventListener("focus", function(){ requestAnimationFrame(function(){autoGrow(ta);}); });
+    card.appendChild(ta);
+
+    var badge=document.createElement("div");
+    badge.className="lvl-badge";
+    badge.textContent = "L"+item.depth;
+    card.appendChild(badge);
+
+    var menuBtn=document.createElement("button");
+    menuBtn.className="menu-btn";
+    menuBtn.innerHTML=ICONS.dots;
+    menuBtn.addEventListener("click", function(ev){ ev.stopPropagation(); openRowMenu(item.id, menuBtn); });
+    card.appendChild(menuBtn);
+
+    row.appendChild(card);
+    wrap.appendChild(row);
+
+    if(!isRoot){
+      bindDrag(row, card.querySelector('[data-role="handle"]'));
+    }
+  });
+
+  els.outlineView.innerHTML="";
+  els.outlineView.appendChild(wrap);
+  Array.prototype.forEach.call(els.outlineView.querySelectorAll("textarea"), autoGrow);
+}
+function autoGrow(ta){
+  ta.style.height="auto";
+  ta.style.height=(ta.scrollHeight)+"px";
+}
+function syncBoardTabName(){ /* board name stays user-controlled; root text no longer forces tab name */ }
+
+function openRowMenu(nodeId, anchorEl){
+  var board = activeBoard();
+  var node = board.nodes[nodeId];
+  var isRoot = nodeId===board.rootId;
+  var sibs = children(board, node.parentId);
+  var idx = sibs.findIndex(function(s){return s.id===nodeId;});
+  var items=[];
+  items.push({label:"子を追加", icon:ICONS.plus, onClick:function(){
+    var id=addNode(board,nodeId,""); render(); focusRow(id);
+  }});
+  if(!isRoot){
+    items.push({label:"兄弟を追加", icon:ICONS.plus, onClick:function(){
+      var id=addNode(board,node.parentId,"");
+      moveNode(board,id,node.parentId, idx+1);
+      render(); focusRow(id);
+    }});
+    items.push({label:"インデント", icon:ICONS.indent, disabled: idx<=0, onClick:function(){ indentNode(board,nodeId); render(); }});
+    items.push({label:"アウトデント", icon:ICONS.outdent, disabled: !board.nodes[node.parentId].parentId, onClick:function(){ outdentNode(board,nodeId); render(); }});
+    items.push({label:"上へ移動", icon:ICONS.up, disabled: idx<=0, onClick:function(){ moveSwap(board,nodeId,-1); render(); }});
+    items.push({label:"下へ移動", icon:ICONS.down, disabled: idx>=sibs.length-1, onClick:function(){ moveSwap(board,nodeId,1); render(); }});
+    items.push({label:"削除", icon:ICONS.trash, danger:true, onClick:function(){
+      var count = flatten(board).filter(function(f){return f.id===nodeId || isDescendant(board,nodeId,f.id);}).length;
+      if(count>1){
+        showConfirm("子要素を含めて"+count+"件を削除します。よろしいですか？", function(){ deleteNode(board,nodeId); render(); });
+      } else {
+        deleteNode(board,nodeId); render();
+      }
+    }});
+  }
+  showPopover(anchorEl, items);
+}
+function focusRow(nodeId){
+  requestAnimationFrame(function(){
+    var row = els.outlineView.querySelector('.row[data-id="'+nodeId+'"] textarea');
+    if(row){ row.focus(); }
+  });
+}
+
+/* drag reorder within same parent */
+function bindDrag(row, handle){
+  if(!handle) return;
+  var startY=0, board, node, sibs, idx, placeholderIdx, rowH;
+  handle.addEventListener("pointerdown", function(ev){
+    ev.preventDefault();
+    board = activeBoard();
+    node = board.nodes[row.dataset.id];
+    sibs = children(board, node.parentId);
+    idx = sibs.findIndex(function(s){return s.id===node.id;});
+    placeholderIdx = idx;
+    startY = ev.clientY;
+    rowH = row.getBoundingClientRect().height + 6;
+    row.classList.add("dragging");
+    row.style.position="relative"; row.style.zIndex=5;
+    try{ handle.setPointerCapture(ev.pointerId); }catch(e){}
+    dragState = {pointerId:ev.pointerId};
+
+    function onMove(mv){
+      var dy = mv.clientY - startY;
+      row.style.transform = "translateY("+dy+"px)";
+      var shift = Math.round(dy/rowH);
+      var target = Math.max(0, Math.min(sibs.length-1, idx+shift));
+      if(target!==placeholderIdx){
+        placeholderIdx = target;
+        Array.prototype.forEach.call(els.outlineView.querySelectorAll(".row"), function(r){
+          if(r===row) return;
+          var rid = r.dataset.id;
+          var sIdx = sibs.findIndex(function(s){return s.id===rid;});
+          if(sIdx<0) return;
+          var visualIdx = sIdx; if(sIdx>idx) visualIdx=sIdx;
+          var offset = 0;
+          if(idx<placeholderIdx && sIdx>idx && sIdx<=placeholderIdx) offset=-1;
+          if(idx>placeholderIdx && sIdx<idx && sIdx>=placeholderIdx) offset=1;
+          r.style.transform = offset? "translateY("+(offset*rowH)+"px)" : "";
+          r.style.transition = "transform .12s";
+        });
+      }
+    }
+    function onUp(){
+      handle.removeEventListener("pointermove", onMove);
+      handle.removeEventListener("pointerup", onUp);
+      handle.removeEventListener("pointercancel", onUp);
+      row.classList.remove("dragging");
+      row.style.transform=""; row.style.position=""; row.style.zIndex="";
+      Array.prototype.forEach.call(els.outlineView.querySelectorAll(".row"), function(r){
+        r.style.transform=""; r.style.transition="";
+      });
+      if(placeholderIdx!==idx){
+        var b2=activeBoard(); var n2=b2.nodes[node.id];
+        moveNode(b2, node.id, n2.parentId, placeholderIdx);
+      }
+      dragState=null;
+      render();
+    }
+    handle.addEventListener("pointermove", onMove);
+    handle.addEventListener("pointerup", onUp);
+    handle.addEventListener("pointercancel", onUp);
+  });
+}
+
+/* ---------------- Popover ---------------- */
+var popoverEl=null, popoverBackdrop=null;
+function showPopover(anchor, items){
+  closePopover();
+  popoverBackdrop=document.createElement("div");
+  popoverBackdrop.id="popoverBackdrop";
+  popoverBackdrop.addEventListener("click", closePopover);
+  document.body.appendChild(popoverBackdrop);
+
+  popoverEl=document.createElement("div");
+  popoverEl.id="popover";
+  items.forEach(function(it){
+    var b=document.createElement("button");
+    b.innerHTML = (it.icon||"")+"<span>"+it.label+"</span>";
+    if(it.danger) b.classList.add("danger");
+    if(it.disabled) b.disabled=true;
+    b.addEventListener("click", function(){ closePopover(); it.onClick(); });
+    popoverEl.appendChild(b);
+  });
+  document.body.appendChild(popoverEl);
+  var r = anchor.getBoundingClientRect();
+  var pw = 190;
+  var left = Math.min(window.innerWidth-pw-8, Math.max(8, r.right-pw));
+  var top = r.bottom+6;
+  popoverEl.style.left=left+"px";
+  var ph = items.length*40+16;
+  if(top+ph>window.innerHeight-8) top = r.top - ph - 6;
+  popoverEl.style.top=Math.max(8,top)+"px";
+}
+function closePopover(){
+  if(popoverEl){ popoverEl.remove(); popoverEl=null; }
+  if(popoverBackdrop){ popoverBackdrop.remove(); popoverBackdrop=null; }
+}
+
+/* ---------------- Pyramid view ---------------- */
+function renderPyramid(){
+  var board = activeBoard();
+  var layout = layoutBoard(board);
+  els.pyramidCanvasWrap.style.width = layout.width+"px";
+  els.pyramidCanvasWrap.style.height = layout.height+"px";
+  els.pyramidSvg.setAttribute("width", layout.width);
+  els.pyramidSvg.setAttribute("height", layout.height);
+  els.pyramidSvg.setAttribute("viewBox","0 0 "+layout.width+" "+layout.height);
+
+  var svgParts=[];
+  var nodesHtml=[];
+
+  function xy(id){
+    var p = layout.pos[id];
+    return { cx: p.x, cy: p.depth*(CARD_H+GAP_Y), depth:p.depth };
+  }
+
+  Object.keys(board.nodes).forEach(function(id){
+    var node = board.nodes[id];
+    if(node.parentId){
+      var a = xy(node.parentId), b = xy(id);
+      svgParts.push('<line x1="'+(a.cx+CARD_W/2)+'" y1="'+(a.cy+CARD_H)+'" x2="'+(b.cx+CARD_W/2)+'" y2="'+b.cy+'"/>');
+    }
+  });
+
+  if(meceOn){
+    var byParent={};
+    Object.keys(board.nodes).forEach(function(id){
+      var pid=board.nodes[id].parentId;
+      if(pid==null) return;
+      (byParent[pid]=byParent[pid]||[]).push(id);
+    });
+    Object.keys(byParent).forEach(function(pid){
+      var kids = byParent[pid].map(function(id){return {id:id, p:xy(id)};}).sort(function(a,b){return a.p.cx-b.p.cx;});
+      for(var i=0;i<kids.length-1;i++){
+        var a=kids[i].p, b=kids[i+1].p;
+        var y = a.cy+CARD_H/2;
+        var x1=a.cx+CARD_W-6, x2=b.cx+6;
+        if(x2>x1){
+          svgParts.push('<line class="mece-arrow" x1="'+x1+'" y1="'+y+'" x2="'+x2+'" y2="'+y+'" marker-start="url(#arrS)" marker-end="url(#arrE)"/>');
+        }
+      }
+    });
+  }
+
+  Object.keys(board.nodes).forEach(function(id){
+    var node = board.nodes[id];
+    var p = xy(id);
+    var isRoot = id===board.rootId;
+    var cls = "pnode"+(isRoot?" root":"");
+    if(linkMode && linkSrc===id) cls+=" link-src";
+    var txt = node.text ? escapeHtml(node.text) : '<span class="empty">'+(isRoot?"主イシュー":"未入力")+'</span>';
+    nodesHtml.push('<div class="'+cls+'" data-id="'+id+'" style="left:'+p.cx+'px;top:'+p.cy+'px;width:'+CARD_W+'px;height:'+CARD_H+'px;--lvl:'+levelColor(p.depth)+'">'+txt+'</div>');
+  });
+
+  var defs = '<defs><marker id="arrS" markerWidth="8" markerHeight="8" refX="1" refY="3" orient="auto"><path d="M6,0 L1,3 L6,6" fill="none" stroke="var(--accent)" stroke-width="1.2"/></marker><marker id="arrE" markerWidth="8" markerHeight="8" refX="5" refY="3" orient="auto"><path d="M0,0 L5,3 L0,6" fill="none" stroke="var(--accent)" stroke-width="1.2"/></marker></defs>';
+  els.pyramidSvg.innerHTML = defs+svgParts.join("");
+  els.pyramidNodes.innerHTML = nodesHtml.join("");
+
+  if(flatten(board).length===1){
+    els.pyramidHint.classList.remove("hidden");
+    els.pyramidHint.textContent="ノードをタップすると編集・追加・削除ができます。「"+ "接続" +"」をオンにすると2つのノードをタップして親子をつなぎ替えられます。";
+  } else {
+    els.pyramidHint.classList.add("hidden");
+  }
+
+  applyPyramidTransform();
+}
+function escapeHtml(s){
+  return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+}
+function applyPyramidTransform(){
+  els.pyramidCanvasWrap.style.transform = "translate("+pyramidTx.x+"px,"+pyramidTx.y+"px) scale("+pyramidTx.scale+")";
+}
+function fitPyramid(){
+  var board=activeBoard();
+  var layout = layoutBoard(board);
+  var vw = els.pyramidView.clientWidth-32, vh = els.pyramidView.clientHeight-32;
+  var s = Math.min(1.15, vw/layout.width, vh/Math.max(layout.height,1));
+  s = Math.max(0.25, s);
+  pyramidTx = {scale:s, x:Math.max(16,(els.pyramidView.clientWidth-layout.width*s)/2), y:16};
+  applyPyramidTransform();
+}
+
+els.pyramidNodes.addEventListener("click", function(ev){
+  var card = ev.target.closest(".pnode");
+  if(!card) return;
+  var id = card.dataset.id;
+  if(linkMode){ handleLinkTap(id); return; }
+  openNodeSheet(id);
+});
+
+function handleLinkTap(id){
+  var board = activeBoard();
+  if(!linkSrc){
+    linkSrc = id;
+    toast("次に親にしたい要素をタップ");
+    renderPyramid();
+    return;
+  }
+  if(linkSrc===id){ linkSrc=null; renderPyramid(); return; }
+  var src = linkSrc; linkSrc=null;
+  if(src===board.rootId){ toast("主イシューは移動できません"); renderPyramid(); return; }
+  if(id===src || isDescendant(board, src, id)){ toast("その組み合わせは接続できません"); renderPyramid(); return; }
+  moveNode(board, src, id, children(board,id).length);
+  toast("接続しました");
+  renderPyramid();
+}
+
+function openNodeSheet(id){
+  var board=activeBoard();
+  var node=board.nodes[id];
+  var isRoot = id===board.rootId;
+  showModal({
+    title: isRoot?"主イシュー":"要素を編集",
+    body:function(wrap){
+      var ta=document.createElement("textarea");
+      ta.className="outdump"; ta.style.height="90px"; ta.style.fontFamily="var(--font-body)"; ta.style.fontSize="14px";
+      ta.value=node.text;
+      wrap.appendChild(ta);
+      setTimeout(function(){ta.focus();},50);
+      return {getText:function(){return ta.value;}};
+    },
+    buttons:(function(){
+      var arr=[{label:"閉じる", onClick:function(){closeModal();}}];
+      if(!isRoot){
+        arr.push({label:"削除", cls:"danger", onClick:function(){
+          var count = flatten(board).filter(function(f){return f.id===id || isDescendant(board,id,f.id);}).length;
+          if(count>1){
+            closeModal();
+            showConfirm("子要素を含めて"+count+"件を削除します。よろしいですか？", function(){ deleteNode(board,id); render(); });
+          } else {
+            deleteNode(board,id); closeModal(); render();
+          }
+        }});
+      }
+      arr.push({label:"子を追加", onClick:function(ctx){ node.text=ctx.getText(); addNode(board,id,""); closeModal(); render(); }});
+      arr.push({label:"保存", cls:"primary", onClick:function(ctx){ node.text=ctx.getText(); closeModal(); render(); }});
+      return arr;
+    })()
+  });
+}
+
+els.linkModeBtn.addEventListener("click", function(){
+  linkMode=!linkMode; linkSrc=null;
+  if(linkMode) toast("つなぎたい要素をタップ");
+  renderToolbarState();
+});
+els.meceBtn.addEventListener("click", function(){ meceOn=!meceOn; renderPyramid(); renderToolbarState(); });
+els.zoomInBtn.addEventListener("click", function(){ pyramidTx.scale=Math.min(2.5,pyramidTx.scale*1.2); applyPyramidTransform(); });
+els.zoomOutBtn.addEventListener("click", function(){ pyramidTx.scale=Math.max(0.25,pyramidTx.scale/1.2); applyPyramidTransform(); });
+els.zoomResetBtn.addEventListener("click", fitPyramid);
+
+/* pan + pinch on pyramid canvas */
+(function(){
+  var pointers={};
+  var panStart=null, pinchStart=null;
+  els.pyramidView.addEventListener("pointerdown", function(ev){
+    if(ev.target.closest(".pnode")) return;
+    pointers[ev.pointerId]={x:ev.clientX,y:ev.clientY};
+    els.pyramidView.setPointerCapture(ev.pointerId);
+    if(Object.keys(pointers).length===1){
+      panStart={x:ev.clientX,y:ev.clientY, tx:pyramidTx.x, ty:pyramidTx.y};
+    } else if(Object.keys(pointers).length===2){
+      var ids=Object.keys(pointers);
+      var p1=pointers[ids[0]], p2=pointers[ids[1]];
+      var dist=Math.hypot(p1.x-p2.x,p1.y-p2.y);
+      pinchStart={dist:dist, scale:pyramidTx.scale};
+      panStart=null;
+    }
+  });
+  els.pyramidView.addEventListener("pointermove", function(ev){
+    if(!(ev.pointerId in pointers)) return;
+    pointers[ev.pointerId]={x:ev.clientX,y:ev.clientY};
+    var ids=Object.keys(pointers);
+    if(ids.length===2 && pinchStart){
+      var p1=pointers[ids[0]], p2=pointers[ids[1]];
+      var dist=Math.hypot(p1.x-p2.x,p1.y-p2.y);
+      pyramidTx.scale = Math.max(0.25,Math.min(2.5, pinchStart.scale*(dist/pinchStart.dist)));
+      applyPyramidTransform();
+    } else if(ids.length===1 && panStart){
+      pyramidTx.x = panStart.tx + (ev.clientX-panStart.x);
+      pyramidTx.y = panStart.ty + (ev.clientY-panStart.y);
+      applyPyramidTransform();
+    }
+  });
+  function end(ev){
+    delete pointers[ev.pointerId];
+    if(Object.keys(pointers).length<2) pinchStart=null;
+    if(Object.keys(pointers).length===0) panStart=null;
+  }
+  els.pyramidView.addEventListener("pointerup", end);
+  els.pyramidView.addEventListener("pointercancel", end);
+})();
+
+/* ---------------- Compare view ---------------- */
+function renderCompare(){
+  var wrap = document.createDocumentFragment();
+  var chipRow = document.createElement("div");
+  chipRow.id="compareChips";
+  state.boards.forEach(function(b){
+    var chip=document.createElement("div");
+    chip.className="chip"+(state.compareIds.indexOf(b.id)>=0?" on":"");
+    var dot=document.createElement("span"); dot.className="dot"; dot.style.background="var("+BOARD_COLORS[b.colorIdx%BOARD_COLORS.length]+")";
+    chip.appendChild(dot);
+    chip.appendChild(document.createTextNode(b.name||"無題"));
+    chip.addEventListener("click", function(){
+      var i = state.compareIds.indexOf(b.id);
+      if(i>=0) state.compareIds.splice(i,1); else state.compareIds.push(b.id);
+      renderCompare(); save();
+    });
+    chipRow.appendChild(chip);
+  });
+  wrap.appendChild(chipRow);
+
+  var picked = state.compareIds.map(boardById).filter(Boolean);
+  if(picked.length<2){
+    var empty=document.createElement("div");
+    empty.className="compare-empty";
+    empty.textContent="比較したいピラミッドを2つ以上選んでください。";
+    wrap.appendChild(empty);
+  } else {
+    picked.forEach(function(b){
+      var card=document.createElement("div");
+      card.className="compare-card";
+      var ch=document.createElement("div");
+      ch.className="ch";
+      var dot=document.createElement("span"); dot.className="dot"; dot.style.background="var("+BOARD_COLORS[b.colorIdx%BOARD_COLORS.length]+")";
+      var name=document.createElement("span"); name.className="name"; name.textContent=b.name||"無題";
+      var open=document.createElement("span"); open.className="open"; open.textContent="開く ›";
+      ch.appendChild(dot); ch.appendChild(name); ch.appendChild(open);
+      ch.addEventListener("click", function(){
+        state.activeBoardId=b.id; currentView="pyramid"; render();
+      });
+      card.appendChild(ch);
+
+      var canvas=document.createElement("div");
+      canvas.className="compare-canvas";
+      var layout = layoutBoard(b);
+      var CW = els.compareView.clientWidth - 26 || 320;
+      var s = Math.min(1, CW/layout.width);
+      var h = layout.height*s+16;
+      canvas.style.height=h+"px";
+      canvas.innerHTML = renderMiniPyramid(b, layout, s);
+      card.appendChild(canvas);
+      wrap.appendChild(card);
+    });
+  }
+
+  els.compareView.innerHTML="";
+  els.compareView.appendChild(wrap);
+}
+function renderMiniPyramid(board, layout, s){
+  var lines=[], nodes=[];
+  function xy(id){ var p=layout.pos[id]; return {cx:p.x*s, cy:p.depth*(CARD_H+GAP_Y)*s, depth:p.depth}; }
+  Object.keys(board.nodes).forEach(function(id){
+    var node=board.nodes[id];
+    if(node.parentId){
+      var a=xy(node.parentId), b=xy(id);
+      lines.push('<line x1="'+(a.cx+CARD_W*s/2)+'" y1="'+(a.cy+CARD_H*s)+'" x2="'+(b.cx+CARD_W*s/2)+'" y2="'+b.cy+'" stroke="var(--ink-faint)" stroke-width="1"/>');
+    }
+  });
+  Object.keys(board.nodes).forEach(function(id){
+    var node=board.nodes[id];
+    var p=xy(id);
+    var isRoot=id===board.rootId;
+    var txt = node.text?escapeHtml(node.text):(isRoot?"主イシュー":"…");
+    nodes.push('<div style="position:absolute;left:'+(p.cx+8)+'px;top:'+(p.cy+8)+'px;width:'+(CARD_W*s-6)+'px;height:'+(CARD_H*s-6)+'px;font-size:'+Math.max(7,10*s)+'px;line-height:1.25;background:var(--surface);border:1px solid var(--line);border-top:2px solid '+(isRoot?"var(--accent-strong)":levelColor(p.depth))+';border-radius:5px;display:flex;align-items:center;justify-content:center;text-align:center;padding:3px;overflow:hidden;color:var(--ink);'+(isRoot?"font-weight:600;":"")+'">'+txt+'</div>');
+  });
+  return '<svg style="position:absolute;left:0;top:0;overflow:visible;pointer-events:none;">'+lines.join("")+'</svg>'+nodes.join("");
+}
+
+/* ---------------- FAB ---------------- */
+els.fab.addEventListener("click", function(){
+  var board = activeBoard();
+  var id = addNode(board, board.rootId, "");
+  if(currentView==="pyramid"){ render(); return; }
+  currentView="outline";
+  render();
+  focusRow(id);
+});
+
+/* ---------------- Modal ---------------- */
+var modalBackdrop=null;
+function showModal(cfg){
+  closeModal();
+  modalBackdrop=document.createElement("div");
+  modalBackdrop.id="modalBackdrop";
+  if(cfg.center) modalBackdrop.classList.add("center");
+  modalBackdrop.addEventListener("click", function(ev){ if(ev.target===modalBackdrop) closeModal(); });
+  var modal=document.createElement("div");
+  modal.id="modal";
+  var h3=document.createElement("h3"); h3.textContent=cfg.title;
+  modal.appendChild(h3);
+  var ctx = cfg.body ? cfg.body(modal) : {};
+  var btnRow=document.createElement("div"); btnRow.className="row-btns";
+  cfg.buttons.forEach(function(b){
+    var btn=document.createElement("button");
+    btn.textContent=b.label;
+    if(b.cls) btn.classList.add(b.cls);
+    btn.addEventListener("click", function(){ b.onClick(ctx); });
+    btnRow.appendChild(btn);
+  });
+  modal.appendChild(btnRow);
+  modalBackdrop.appendChild(modal);
+  document.body.appendChild(modalBackdrop);
+}
+function closeModal(){ if(modalBackdrop){ modalBackdrop.remove(); modalBackdrop=null; } }
+
+function showConfirm(message, onYes){
+  showModal({
+    title: "確認",
+    center: true,
+    body: function(wrap){
+      var p=document.createElement("p");
+      p.textContent = message;
+      wrap.insertBefore(p, wrap.querySelector(".row-btns"));
+    },
+    buttons:[
+      {label:"キャンセル", onClick:function(){ closeModal(); }},
+      {label:"削除する", cls:"danger", onClick:function(){ closeModal(); onYes(); }}
+    ]
+  });
+}
+
+/* ---------------- theme sync (host toggler support) ---------------- */
+function syncTheme(){}
+var mo = new MutationObserver(syncTheme);
+try{ mo.observe(document.documentElement,{attributes:true, attributeFilter:["data-theme"]}); }catch(e){}
+
+/* ---------------- resize ---------------- */
+window.addEventListener("resize", function(){
+  if(currentView==="pyramid") fitPyramid();
+});
+
+/* ---------------- init ---------------- */
+render();
+if(currentView==="pyramid") fitPyramid();
+window.addEventListener("load", function(){ if(currentView==="pyramid") fitPyramid(); });
+
+})();
+</script>
