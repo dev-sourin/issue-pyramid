@@ -23,6 +23,10 @@
     --board-2:#B5502B;
     --board-3:#4B7A51;
     --board-4:#7A4B8A;
+    --kind-issue:#2B6CB0;
+    --kind-hypothesis:#B7791F;
+    --kind-action:#2F855A;
+    --kind-text:#FFFFFF;
     --font-mono: ui-monospace, "SFMono-Regular", Menlo, Consolas, "Liberation Mono", monospace;
     --font-body: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Hiragino Kaku Gothic ProN", "Hiragino Sans", "Noto Sans JP", sans-serif;
   }
@@ -47,6 +51,10 @@
       --board-2:#E08A5C;
       --board-3:#8FC496;
       --board-4:#C6A0DA;
+      --kind-issue:#6FA8DC;
+      --kind-hypothesis:#D9A64E;
+      --kind-action:#5FBE8B;
+      --kind-text:#0B1620;
     }
   }
   :root[data-theme="dark"]{
@@ -56,6 +64,7 @@
     --danger:#E08A76; --danger-bg:#3A2622;
     --shadow: 0 1px 2px rgba(0,0,0,0.4), 0 8px 22px rgba(0,0,0,0.4);
     --board-1:#6FB3DE; --board-2:#E08A5C; --board-3:#8FC496; --board-4:#C6A0DA;
+    --kind-issue:#6FA8DC; --kind-hypothesis:#D9A64E; --kind-action:#5FBE8B; --kind-text:#0B1620;
   }
   :root[data-theme="light"]{
     --bg:#EEF1F5; --bg-grid: rgba(31,92,130,0.07); --surface:#FFFFFF; --surface-alt:#E1E7EE;
@@ -64,6 +73,7 @@
     --danger:#A23B2E; --danger-bg:#F7E7E3;
     --shadow: 0 1px 2px rgba(20,30,40,0.08), 0 6px 18px rgba(20,30,40,0.08);
     --board-1:#1F5C82; --board-2:#B5502B; --board-3:#4B7A51; --board-4:#7A4B8A;
+    --kind-issue:#2B6CB0; --kind-hypothesis:#B7791F; --kind-action:#2F855A; --kind-text:#FFFFFF;
   }
 
   *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
@@ -145,7 +155,7 @@
   .row .indent-guides{flex:0 0 auto; display:flex; align-self:stretch;}
   .row .indent-guides i{width:18px; border-right:1px solid var(--line); margin-right:0; opacity:.6;}
   .row .card{
-    flex:1; display:flex; align-items:flex-start; gap:6px; background:var(--surface);
+    flex:1; min-width:0; display:flex; align-items:flex-start; gap:6px; background:var(--surface);
     border:1px solid var(--line); border-left:3px solid var(--lvl,var(--accent));
     border-radius:var(--radius); padding:8px 6px 8px 10px; box-shadow:var(--shadow);
   }
@@ -156,9 +166,17 @@
   }
   .row .handle svg{width:14px;height:14px;}
   .row textarea{
-    flex:1; border:none; background:transparent; resize:none; color:var(--ink); font-size:14.5px;
+    flex:1; min-width:0; border:none; background:transparent; resize:none; color:var(--ink); font-size:14.5px;
     line-height:1.5; padding:5px 2px; outline:none; overflow:hidden; min-height:30px;
   }
+  .tag-chip{
+    flex:0 0 auto; display:flex; align-items:center; justify-content:center;
+    height:26px; min-width:26px; padding:0 4px; margin-top:3px; border-radius:999px;
+    font-family:var(--font-mono); font-size:10px; letter-spacing:.02em; white-space:nowrap; cursor:pointer;
+    border:1px dashed var(--line); background:transparent; color:var(--ink-faint);
+  }
+  .tag-chip svg{width:13px;height:13px; display:block;}
+  .tag-chip.set{ border-style:solid; border-color:transparent; color:var(--kind-text); padding:0 10px; }
   .row .lvl-badge{
     font-family:var(--font-mono); font-size:9.5px; letter-spacing:.03em; color:var(--ink-faint);
     padding-top:8px; flex:0 0 auto;
@@ -208,13 +226,21 @@
   .pnode{
     position:absolute; background:var(--surface); border:1px solid var(--line);
     border-top:3px solid var(--lvl,var(--accent)); border-radius:8px; box-shadow:var(--shadow);
-    padding:8px 9px; font-size:12px; line-height:1.4; color:var(--ink); overflow:hidden;
-    display:flex; align-items:center; justify-content:center; text-align:center; cursor:pointer;
+    cursor:pointer;
   }
   .pnode.root{border-top-color:var(--accent-strong); font-weight:600; background:var(--surface-alt);}
+  .pnode-body{
+    width:100%; height:100%; padding:8px 9px; font-size:12px; line-height:1.4; color:var(--ink);
+    overflow:hidden; display:flex; align-items:center; justify-content:center; text-align:center;
+  }
   .pnode .empty{color:var(--ink-faint); font-style:italic;}
   .pnode.link-src{outline:2px solid var(--accent); outline-offset:2px;}
   .pnode.link-hover{outline:2px dashed var(--accent); outline-offset:2px;}
+  .ptag{
+    position:absolute; top:-9px; left:8px; font-family:var(--font-mono); font-size:8.5px;
+    letter-spacing:.02em; padding:2px 7px; border-radius:999px; color:var(--kind-text);
+    white-space:nowrap; box-shadow:var(--shadow); pointer-events:none;
+  }
 
   #pyramidHint{
     position:absolute; left:12px; top:12px; z-index:5; background:var(--surface); border:1px solid var(--line);
@@ -277,6 +303,18 @@
   #modal button.primary{background:var(--accent); color:var(--accent-contrast); border-color:var(--accent);}
   #modal button.danger{background:var(--danger-bg); color:var(--danger); border-color:var(--danger-bg);}
   #modal p{font-size:13.5px; color:var(--ink-soft); line-height:1.6; margin:0 0 16px;}
+  .kind-picker{ display:flex; gap:6px; flex-wrap:wrap; margin:2px 0 16px; }
+  .kind-opt{
+    flex:0 0 auto; display:flex; align-items:center; gap:5px; padding:7px 12px; border-radius:999px;
+    border:1px solid var(--line); background:transparent; color:var(--ink-soft); font-size:12.5px; cursor:pointer;
+  }
+  .kind-opt .sw{width:9px;height:9px;border-radius:50%;flex:0 0 auto;}
+  .kind-opt.active{ color:var(--kind-text); border-color:transparent; font-weight:600; }
+  .kind-opt.active.kind-none{ background:var(--surface-alt-2); color:var(--ink); border-color:var(--ink-faint); }
+
+  .tag-chip.kind-issue, .ptag.kind-issue, .kind-opt.active.kind-issue{ background:var(--kind-issue); }
+  .tag-chip.kind-hypothesis, .ptag.kind-hypothesis, .kind-opt.active.kind-hypothesis{ background:var(--kind-hypothesis); }
+  .tag-chip.kind-action, .ptag.kind-action, .kind-opt.active.kind-action{ background:var(--kind-action); }
   #modal textarea.outdump{
     width:100%; height:160px; border:1px solid var(--line); border-radius:8px; background:var(--bg);
     color:var(--ink); font-family:var(--font-mono); font-size:11.5px; padding:10px; margin-bottom:12px;
@@ -348,8 +386,17 @@ var ICONS = {
   zoomIn:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3M11 8v6M8 11h6"/></svg>',
   zoomOut:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3M8 11h6"/></svg>',
   fit:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3M16 3h3a2 2 0 0 1 2 2v3M8 21H5a2 2 0 0 1-2-2v-3M16 21h3a2 2 0 0 0 2-2v-3"/></svg>',
-  copy:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v1"/></svg>'
+  copy:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v1"/></svg>',
+  tag:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12.6 3H6a2 2 0 0 0-2 2v6.6c0 .5.2 1 .6 1.4l9 9c.8.8 2 .8 2.8 0l6-6c.8-.8.8-2 0-2.8l-9-9c-.4-.4-.9-.6-1.4-.6Z"/><circle cx="8" cy="8" r="1.3" fill="currentColor" stroke="none"/></svg>',
+  check:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12l5 5L20 6"/></svg>'
 };
+
+var KIND_META = {
+  issue: {label:"イシュー", css:"kind-issue", cssvar:"--kind-issue"},
+  hypothesis: {label:"仮説", css:"kind-hypothesis", cssvar:"--kind-hypothesis"},
+  action: {label:"アクション", css:"kind-action", cssvar:"--kind-action"}
+};
+var KIND_ORDER = ["issue","hypothesis","action"];
 
 var STORAGE_KEY = "issue-pyramid-v1";
 var storageOK = true;
@@ -363,7 +410,7 @@ function uid(){ return Math.random().toString(36).slice(2,10) + Date.now().toStr
 function newBoard(name, colorIdx){
   var rootId = uid();
   var b = { id: uid(), name: name, colorIdx: (colorIdx||0)%BOARD_COLORS.length, rootId: rootId, nodes:{} };
-  b.nodes[rootId] = { id: rootId, text:"", parentId:null, order:0 };
+  b.nodes[rootId] = { id: rootId, text:"", parentId:null, order:0, kind:null };
   return b;
 }
 
@@ -432,7 +479,7 @@ function normalizeOrders(board, parentId){
 function addNode(board, parentId, text){
   var id = uid();
   var kids = children(board, parentId);
-  board.nodes[id] = { id:id, text:text||"", parentId:parentId, order:kids.length };
+  board.nodes[id] = { id:id, text:text||"", parentId:parentId, order:kids.length, kind:null };
   return id;
 }
 function deleteNode(board, nodeId){
@@ -632,7 +679,7 @@ function duplicateBoard(b){
   Object.keys(copy.nodes).forEach(function(oldId){
     var n = copy.nodes[oldId];
     var nid = idMap[oldId];
-    newNodes[nid] = { id:nid, text:n.text, order:n.order, parentId: n.parentId?idMap[n.parentId]:null };
+    newNodes[nid] = { id:nid, text:n.text, order:n.order, kind:n.kind||null, parentId: n.parentId?idMap[n.parentId]:null };
   });
   copy.nodes = newNodes;
   copy.rootId = idMap[b.rootId];
@@ -727,6 +774,8 @@ function renderOutline(){
       card.appendChild(handle);
     }
 
+    card.appendChild(buildTagChip(node));
+
     var ta = document.createElement("textarea");
     ta.rows=1;
     ta.value = node.text;
@@ -807,6 +856,34 @@ function focusRow(nodeId){
   });
 }
 
+function buildTagChip(node){
+  var btn=document.createElement("button");
+  btn.type="button";
+  refreshTagChip(btn, node);
+  btn.addEventListener("click", function(ev){
+    ev.stopPropagation();
+    openKindMenu(node, btn);
+  });
+  return btn;
+}
+function refreshTagChip(btn, node){
+  btn.className = "tag-chip" + (node.kind ? " set "+KIND_META[node.kind].css : "");
+  btn.innerHTML = node.kind ? escapeHtml(KIND_META[node.kind].label) : ICONS.tag;
+  btn.title = node.kind ? KIND_META[node.kind].label : "タグを設定（イシュー / 仮説 / アクション）";
+}
+function kindSwatch(k){
+  var color = k ? "var("+KIND_META[k].cssvar+")" : "var(--ink-faint)";
+  return '<span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:'+color+';flex:0 0 auto;"></span>';
+}
+function openKindMenu(node, anchor){
+  var items=[];
+  items.push({label:"なし", icon:kindSwatch(null), current:!node.kind, onClick:function(){ node.kind=null; render(); }});
+  KIND_ORDER.forEach(function(k){
+    items.push({label:KIND_META[k].label, icon:kindSwatch(k), current:node.kind===k, onClick:function(){ node.kind=k; render(); }});
+  });
+  showPopover(anchor, items);
+}
+
 /* drag reorder within same parent */
 function bindDrag(row, handle){
   if(!handle) return;
@@ -881,7 +958,7 @@ function showPopover(anchor, items){
   popoverEl.id="popover";
   items.forEach(function(it){
     var b=document.createElement("button");
-    b.innerHTML = (it.icon||"")+"<span>"+it.label+"</span>";
+    b.innerHTML = (it.icon||"")+'<span style="flex:1">'+it.label+"</span>"+(it.current?ICONS.check:"");
     if(it.danger) b.classList.add("danger");
     if(it.disabled) b.disabled=true;
     b.addEventListener("click", function(){ closePopover(); it.onClick(); });
@@ -955,7 +1032,8 @@ function renderPyramid(){
     var cls = "pnode"+(isRoot?" root":"");
     if(linkMode && linkSrc===id) cls+=" link-src";
     var txt = node.text ? escapeHtml(node.text) : '<span class="empty">'+(isRoot?"主イシュー":"未入力")+'</span>';
-    nodesHtml.push('<div class="'+cls+'" data-id="'+id+'" style="left:'+p.cx+'px;top:'+p.cy+'px;width:'+CARD_W+'px;height:'+CARD_H+'px;--lvl:'+levelColor(p.depth)+'">'+txt+'</div>');
+    var tagHtml = node.kind ? '<span class="ptag '+KIND_META[node.kind].css+'">'+escapeHtml(KIND_META[node.kind].label)+'</span>' : '';
+    nodesHtml.push('<div class="'+cls+'" data-id="'+id+'" style="left:'+p.cx+'px;top:'+p.cy+'px;width:'+CARD_W+'px;height:'+CARD_H+'px;--lvl:'+levelColor(p.depth)+'">'+tagHtml+'<div class="pnode-body">'+txt+'</div></div>');
   });
 
   var defs = '<defs><marker id="arrS" markerWidth="8" markerHeight="8" refX="1" refY="3" orient="auto"><path d="M6,0 L1,3 L6,6" fill="none" stroke="var(--accent)" stroke-width="1.2"/></marker><marker id="arrE" markerWidth="8" markerHeight="8" refX="5" refY="3" orient="auto"><path d="M0,0 L5,3 L0,6" fill="none" stroke="var(--accent)" stroke-width="1.2"/></marker></defs>';
@@ -1024,6 +1102,30 @@ function openNodeSheet(id){
       ta.value=node.text;
       wrap.appendChild(ta);
       setTimeout(function(){ta.focus();},50);
+
+      var kindWrap=document.createElement("div");
+      kindWrap.className="kind-picker";
+      function buildKindOpt(k){
+        var opt=document.createElement("button");
+        opt.type="button";
+        opt.className="kind-opt"+(k?" "+KIND_META[k].css:" kind-none")+(node.kind===k?" active":"");
+        var sw=document.createElement("span");
+        sw.className="sw";
+        sw.style.background = k ? "var("+KIND_META[k].cssvar+")" : "var(--ink-faint)";
+        opt.appendChild(sw);
+        opt.appendChild(document.createTextNode(k?KIND_META[k].label:"なし"));
+        opt.addEventListener("click", function(){
+          node.kind = k;
+          Array.prototype.forEach.call(kindWrap.children, function(el){ el.classList.remove("active"); });
+          opt.classList.add("active");
+          render();
+        });
+        return opt;
+      }
+      kindWrap.appendChild(buildKindOpt(null));
+      KIND_ORDER.forEach(function(k){ kindWrap.appendChild(buildKindOpt(k)); });
+      wrap.appendChild(kindWrap);
+
       return {getText:function(){return ta.value;}};
     },
     buttons:(function(){
@@ -1171,6 +1273,9 @@ function renderMiniPyramid(board, layout, s){
     var isRoot=id===board.rootId;
     var txt = node.text?escapeHtml(node.text):(isRoot?"主イシュー":"…");
     nodes.push('<div style="position:absolute;left:'+(p.cx+8)+'px;top:'+(p.cy+8)+'px;width:'+(CARD_W*s-6)+'px;height:'+(CARD_H*s-6)+'px;font-size:'+Math.max(7,10*s)+'px;line-height:1.25;background:var(--surface);border:1px solid var(--line);border-top:2px solid '+(isRoot?"var(--accent-strong)":levelColor(p.depth))+';border-radius:5px;display:flex;align-items:center;justify-content:center;text-align:center;padding:3px;overflow:hidden;color:var(--ink);'+(isRoot?"font-weight:600;":"")+'">'+txt+'</div>');
+    if(node.kind){
+      nodes.push('<span style="position:absolute;left:'+(p.cx+8-3)+'px;top:'+(p.cy+8-3)+'px;width:7px;height:7px;border-radius:50%;background:var('+KIND_META[node.kind].cssvar+');border:1px solid var(--surface);"></span>');
+    }
   });
   return '<svg style="position:absolute;left:0;top:0;overflow:visible;pointer-events:none;">'+lines.join("")+'</svg>'+nodes.join("");
 }
