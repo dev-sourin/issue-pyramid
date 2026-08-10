@@ -295,7 +295,7 @@
     width:100%; padding:10px 12px; border:1px solid var(--line); border-radius:8px; background:var(--bg);
     color:var(--ink); font-size:14px; margin-bottom:14px;
   }
-  #modal .row-btns{display:flex; gap:8px; justify-content:flex-end;}
+  #modal .row-btns{display:flex; flex-wrap:wrap; gap:8px; justify-content:flex-end;}
   #modal button{
     padding:9px 16px; border-radius:8px; border:1px solid var(--line); background:var(--surface-alt);
     color:var(--ink); font-size:13.5px; cursor:pointer;
@@ -319,6 +319,14 @@
     width:100%; height:160px; border:1px solid var(--line); border-radius:8px; background:var(--bg);
     color:var(--ink); font-family:var(--font-mono); font-size:11.5px; padding:10px; margin-bottom:12px;
   }
+  .ai-sugg-list{ display:flex; flex-direction:column; gap:8px; margin-bottom:16px; }
+  .ai-sugg-item{
+    display:flex; align-items:center; gap:9px; padding:10px 12px; border:1px solid var(--line);
+    border-radius:10px; background:var(--bg); cursor:pointer; font-size:13.5px; line-height:1.5;
+  }
+  .ai-sugg-item input[type=checkbox]{flex:0 0 auto; width:17px; height:17px; accent-color:var(--accent);}
+  .ai-sugg-item .sw{width:9px;height:9px;border-radius:50%;flex:0 0 auto;}
+  .ai-sugg-item .tx{flex:1; color:var(--ink);}
 
   #toast{
     position:fixed; left:50%; bottom:calc(90px + env(safe-area-inset-bottom)); transform:translateX(-50%);
@@ -336,6 +344,7 @@
   <header id="topbar">
     <div id="boardTabs"></div>
     <button class="tab-add" id="addBoardBtn" title="新しいピラミッド">+</button>
+    <button class="tab-add" id="apiKeyBtn" title="AI設定（APIキー）"></button>
   </header>
   <div id="toolbar">
     <div class="segmented" id="viewSwitch">
@@ -388,7 +397,9 @@ var ICONS = {
   fit:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3M16 3h3a2 2 0 0 1 2 2v3M8 21H5a2 2 0 0 1-2-2v-3M16 21h3a2 2 0 0 0 2-2v-3"/></svg>',
   copy:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v1"/></svg>',
   tag:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12.6 3H6a2 2 0 0 0-2 2v6.6c0 .5.2 1 .6 1.4l9 9c.8.8 2 .8 2.8 0l6-6c.8-.8.8-2 0-2.8l-9-9c-.4-.4-.9-.6-1.4-.6Z"/><circle cx="8" cy="8" r="1.3" fill="currentColor" stroke="none"/></svg>',
-  check:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12l5 5L20 6"/></svg>'
+  check:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12l5 5L20 6"/></svg>',
+  sparkle:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v4M12 17v4M3 12h4M17 12h4M6 6l2.5 2.5M15.5 15.5 18 18M18 6l-2.5 2.5M8.5 15.5 6 18"/><circle cx="12" cy="12" r="2.4" fill="currentColor" stroke="none"/></svg>',
+  key:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="15" r="4"/><path d="M11 12l8-8M16 5l3 3M13 8l2.5 2.5"/></svg>'
 };
 
 var KIND_META = {
@@ -404,6 +415,20 @@ try{ var t="__t"; localStorage.setItem(t,"1"); localStorage.removeItem(t); }catc
 
 var BOARD_COLORS = ["--board-1","--board-2","--board-3","--board-4"];
 var LEVEL_COLORS_LIGHT = ["#123B57","#1F5C82","#3E82A8","#7BA9C4"];
+
+var API_KEY_STORAGE = "issue-pyramid-anthropic-key";
+function getApiKey(){
+  if(!storageOK) return "";
+  try{ return localStorage.getItem(API_KEY_STORAGE) || ""; }catch(e){ return ""; }
+}
+function setApiKey(key){
+  if(!storageOK) return;
+  try{ localStorage.setItem(API_KEY_STORAGE, key); }catch(e){}
+}
+function clearApiKey(){
+  if(!storageOK) return;
+  try{ localStorage.removeItem(API_KEY_STORAGE); }catch(e){}
+}
 
 function uid(){ return Math.random().toString(36).slice(2,10) + Date.now().toString(36).slice(-4); }
 
@@ -585,7 +610,8 @@ var els = {
   zoomInBtn: document.getElementById("zoomInBtn"),
   zoomOutBtn: document.getElementById("zoomOutBtn"),
   zoomResetBtn: document.getElementById("zoomResetBtn"),
-  toast: document.getElementById("toast")
+  toast: document.getElementById("toast"),
+  apiKeyBtn: document.getElementById("apiKeyBtn")
 };
 els.fab.innerHTML = ICONS.plus;
 els.linkModeBtn.innerHTML = ICONS.link;
@@ -593,6 +619,7 @@ els.meceBtn.innerHTML = ICONS.mece;
 els.zoomInBtn.innerHTML = ICONS.zoomIn;
 els.zoomOutBtn.innerHTML = ICONS.zoomOut;
 els.zoomResetBtn.innerHTML = ICONS.fit;
+els.apiKeyBtn.innerHTML = ICONS.key;
 
 var currentView = "outline";
 var linkMode = false;
@@ -711,6 +738,253 @@ els.addBoardBtn.addEventListener("click", function(){
   });
 });
 
+els.apiKeyBtn.addEventListener("click", openApiKeyModal);
+function openApiKeyModal(){
+  var existing = getApiKey();
+  showModal({
+    title:"AI設定（Anthropic APIキー）",
+    center:true,
+    body:function(wrap){
+      var p=document.createElement("p");
+      p.textContent="AIによる要素分解の提案には、あなた自身のAnthropic APIキーが必要です。キーはこの端末のブラウザにのみ保存され、Anthropic社のAPI（api.anthropic.com）以外には送信されません。console.anthropic.com で取得できます。";
+      wrap.insertBefore(p, wrap.querySelector(".row-btns"));
+      var input=document.createElement("input");
+      input.type="password"; input.placeholder="sk-ant-...";
+      input.value=existing;
+      input.autocomplete="off";
+      wrap.insertBefore(input, wrap.querySelector(".row-btns"));
+      setTimeout(function(){input.focus();},50);
+      return {getKey:function(){return input.value.trim();}};
+    },
+    buttons:(function(){
+      var arr=[{label:"キャンセル", onClick:function(){closeModal();}}];
+      if(existing){
+        arr.push({label:"キーを削除", cls:"danger", onClick:function(){
+          clearApiKey(); closeModal(); toast("APIキーを削除しました");
+        }});
+      }
+      arr.push({label:"保存", cls:"primary", onClick:function(ctx){
+        var k=ctx.getKey();
+        if(!k){ toast("APIキーを入力してください"); return; }
+        setApiKey(k); closeModal(); toast("APIキーを保存しました");
+      }});
+      return arr;
+    })()
+  });
+}
+
+/* ---------------- AI decomposition suggestions ---------------- */
+function buildAiContext(board, nodeId){
+  var chain=[]; var cur=board.nodes[nodeId];
+  while(cur){ chain.unshift(cur); cur = cur.parentId? board.nodes[cur.parentId] : null; }
+  var lines=[];
+  chain.forEach(function(n, i){
+    var prefix = i===0 ? "主イシュー: " : (new Array(i+1).join("  ") + "└ ");
+    var kindLabel = n.kind ? "["+KIND_META[n.kind].label+"] " : "";
+    lines.push(prefix + kindLabel + (n.text || "(未入力)"));
+  });
+  var kids = children(board, nodeId);
+  lines.push(kids.length ? ("既存の子要素: " + kids.map(function(k){return k.text||"(未入力)";}).join(" / ")) : "既存の子要素: なし");
+  return lines.join("\n");
+}
+
+function callClaudeSuggest(contextText, extraHint){
+  var key = getApiKey();
+  if(!key) return Promise.reject({code:"NO_KEY"});
+  var system = "あなたはコンサルティングファームのプリンシパルとして、MECE（相互に重複せず、全体として漏れがない）なイシューツリーの分解を支援します。与えられた要素を3〜5個の下位要素に分解してください。下位要素どうしが重複しないようにし、既存の子要素があればそれとも重複しないようにしてください。各下位要素について、それが「イシュー」（検討すべき論点）、「仮説」（検証すべき仮説）、「アクション」（実行すべき具体的な施策）のいずれに最も近いかを判定してください。分類しにくい場合は\"none\"としてください。すべて日本語で、簡潔に（各20〜40文字程度）出力してください。";
+  var userText = contextText + (extraHint ? ("\n\n追加の指示: "+extraHint) : "");
+  var schema = {
+    type:"object",
+    properties:{
+      suggestions:{
+        type:"array",
+        items:{
+          type:"object",
+          properties:{
+            text:{type:"string"},
+            kind:{type:"string", "enum":["issue","hypothesis","action","none"]}
+          },
+          required:["text","kind"],
+          additionalProperties:false
+        }
+      }
+    },
+    required:["suggestions"],
+    additionalProperties:false
+  };
+  return fetch("https://api.anthropic.com/v1/messages", {
+    method:"POST",
+    headers:{
+      "content-type":"application/json",
+      "x-api-key": key,
+      "anthropic-version":"2023-06-01",
+      "anthropic-dangerous-direct-browser-access":"true"
+    },
+    body: JSON.stringify({
+      model:"claude-opus-5",
+      max_tokens: 3000,
+      output_config:{ effort:"low", format:{ type:"json_schema", schema: schema } },
+      system: system,
+      messages:[{role:"user", content:userText}]
+    })
+  }).catch(function(){
+    return Promise.reject({code:"NETWORK"});
+  }).then(function(resp){
+    if(resp.status===401 || resp.status===403) return Promise.reject({code:"AUTH"});
+    if(resp.status===429) return Promise.reject({code:"RATE"});
+    if(!resp.ok){
+      return resp.json().catch(function(){return null;}).then(function(body){
+        return Promise.reject({code:"API", message: body && body.error && body.error.message});
+      });
+    }
+    return resp.json();
+  }).then(function(data){
+    if(data.stop_reason==="refusal") return Promise.reject({code:"REFUSAL"});
+    var textBlock = (data.content||[]).filter(function(b){return b.type==="text";})[0];
+    if(!textBlock) return Promise.reject({code:"PARSE"});
+    var parsed;
+    try{ parsed = JSON.parse(textBlock.text); }catch(e){ return Promise.reject({code:"PARSE"}); }
+    return (parsed.suggestions||[]).filter(function(s){return s && s.text;});
+  });
+}
+
+function aiErrorMessage(err){
+  var code = err && err.code;
+  if(code==="NO_KEY") return "APIキーが設定されていません。";
+  if(code==="AUTH") return "認証エラーです。APIキーを確認してください。";
+  if(code==="RATE") return "レート制限に達しました。しばらく待って再試行してください。";
+  if(code==="REFUSAL") return "この内容についてはAIが提案を生成できませんでした。";
+  if(code==="NETWORK") return "通信エラーが発生しました。ネットワーク接続を確認してください。";
+  if(code==="PARSE") return "AIの応答を解析できませんでした。もう一度お試しください。";
+  return "エラーが発生しました。" + (err && err.message ? ("（"+err.message+"）") : "");
+}
+
+function openAiSuggestModal(nodeId){
+  if(!getApiKey()){
+    showModal({
+      title:"APIキーが未設定です",
+      center:true,
+      body:function(wrap){
+        var p=document.createElement("p");
+        p.textContent="AIによる分解提案には、あなた自身のAnthropic APIキーの設定が必要です。";
+        wrap.insertBefore(p, wrap.querySelector(".row-btns"));
+        return {};
+      },
+      buttons:[
+        {label:"閉じる", onClick:function(){closeModal();}},
+        {label:"APIキーを設定", cls:"primary", onClick:function(){ closeModal(); openApiKeyModal(); }}
+      ]
+    });
+    return;
+  }
+  showAiInputStep(nodeId);
+}
+function showAiInputStep(nodeId){
+  var board=activeBoard();
+  var node=board.nodes[nodeId];
+  showModal({
+    title:"AIで分解案を提案",
+    body:function(wrap){
+      var p=document.createElement("p");
+      p.textContent = "対象: " + (node.text || "（未入力）");
+      wrap.insertBefore(p, wrap.querySelector(".row-btns"));
+      var hintInput=document.createElement("input");
+      hintInput.type="text";
+      hintInput.placeholder="追加の指示（任意。例：〇〇業界に特化して）";
+      wrap.insertBefore(hintInput, wrap.querySelector(".row-btns"));
+      setTimeout(function(){hintInput.focus();},50);
+      return {getHint:function(){return hintInput.value.trim();}};
+    },
+    buttons:[
+      {label:"キャンセル", onClick:function(){closeModal();}},
+      {label:"提案を生成", cls:"primary", onClick:function(ctx){ showAiLoadingStep(nodeId, ctx.getHint()); }}
+    ]
+  });
+}
+function showAiLoadingStep(nodeId, hint){
+  showModal({
+    title:"AIで分解案を提案",
+    center:true,
+    body:function(wrap){
+      var p=document.createElement("p");
+      p.textContent="生成中…";
+      wrap.insertBefore(p, wrap.querySelector(".row-btns"));
+      return {};
+    },
+    buttons:[]
+  });
+  var board=activeBoard();
+  var contextText = buildAiContext(board, nodeId);
+  callClaudeSuggest(contextText, hint).then(function(list){
+    if(!document.getElementById("modal")) return;
+    if(!list.length){ showAiErrorStep(nodeId, hint, "提案が得られませんでした。もう一度お試しください。"); return; }
+    showAiResultsStep(nodeId, list);
+  }, function(err){
+    if(!document.getElementById("modal")) return;
+    showAiErrorStep(nodeId, hint, aiErrorMessage(err));
+  });
+}
+function showAiErrorStep(nodeId, hint, message){
+  showModal({
+    title:"AIで分解案を提案",
+    center:true,
+    body:function(wrap){
+      var p=document.createElement("p");
+      p.textContent=message;
+      wrap.insertBefore(p, wrap.querySelector(".row-btns"));
+      return {};
+    },
+    buttons:[
+      {label:"閉じる", onClick:function(){closeModal();}},
+      {label:"再試行", cls:"primary", onClick:function(){ showAiLoadingStep(nodeId, hint); }}
+    ]
+  });
+}
+function showAiResultsStep(nodeId, list){
+  showModal({
+    title:"提案された分解案",
+    body:function(wrap){
+      var listWrap=document.createElement("div");
+      listWrap.className="ai-sugg-list";
+      var checks=[];
+      list.forEach(function(item){
+        var row=document.createElement("label");
+        row.className="ai-sugg-item";
+        var cb=document.createElement("input");
+        cb.type="checkbox"; cb.checked=true;
+        row.appendChild(cb);
+        var kind = (item.kind && item.kind!=="none") ? item.kind : null;
+        var sw=document.createElement("span");
+        sw.className="sw";
+        sw.style.background = kind ? "var("+KIND_META[kind].cssvar+")" : "var(--ink-faint)";
+        row.appendChild(sw);
+        var txt=document.createElement("span");
+        txt.className="tx";
+        txt.textContent=item.text;
+        row.appendChild(txt);
+        listWrap.appendChild(row);
+        checks.push({cb:cb, text:item.text, kind:kind});
+      });
+      wrap.insertBefore(listWrap, wrap.querySelector(".row-btns"));
+      return {getSelected:function(){ return checks.filter(function(c){return c.cb.checked;}); }};
+    },
+    buttons:[
+      {label:"閉じる", onClick:function(){closeModal();}},
+      {label:"選択した項目を追加", cls:"primary", onClick:function(ctx){
+        var board=activeBoard();
+        var sel=ctx.getSelected();
+        if(!sel.length){ toast("項目を選択してください"); return; }
+        sel.forEach(function(s){
+          var id=addNode(board, nodeId, s.text);
+          if(s.kind) board.nodes[id].kind = s.kind;
+        });
+        closeModal(); render();
+        toast(sel.length+"件追加しました");
+      }}
+    ]
+  });
+}
+
 function renderToolbarState(){
   Array.prototype.forEach.call(els.viewSwitch.children, function(btn){
     btn.classList.toggle("active", btn.dataset.view===currentView);
@@ -828,6 +1102,7 @@ function openRowMenu(nodeId, anchorEl){
   items.push({label:"子を追加", icon:ICONS.plus, onClick:function(){
     var id=addNode(board,nodeId,""); render(); focusRow(id);
   }});
+  items.push({label:"AIで分解案を提案", icon:ICONS.sparkle, onClick:function(){ openAiSuggestModal(nodeId); }});
   if(!isRoot){
     items.push({label:"兄弟を追加", icon:ICONS.plus, onClick:function(){
       var id=addNode(board,node.parentId,"");
@@ -1142,6 +1417,7 @@ function openNodeSheet(id){
         }});
       }
       arr.push({label:"子を追加", onClick:function(ctx){ node.text=ctx.getText(); addNode(board,id,""); closeModal(); render(); }});
+      arr.push({label:"AI提案", onClick:function(ctx){ node.text=ctx.getText(); save(); closeModal(); openAiSuggestModal(id); }});
       arr.push({label:"保存", cls:"primary", onClick:function(ctx){ node.text=ctx.getText(); closeModal(); render(); }});
       return arr;
     })()
