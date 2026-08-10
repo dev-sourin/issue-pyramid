@@ -784,14 +784,24 @@ function buildAiContext(board, nodeId){
     lines.push(prefix + kindLabel + (n.text || "(未入力)"));
   });
   var kids = children(board, nodeId);
-  lines.push(kids.length ? ("既存の子要素: " + kids.map(function(k){return k.text||"(未入力)";}).join(" / ")) : "既存の子要素: なし");
+  lines.push(kids.length ? ("既存の子要素: " + kids.map(function(k){
+    var kl = k.kind ? "["+KIND_META[k.kind].label+"] " : "";
+    return kl + (k.text||"(未入力)");
+  }).join(" / ")) : "既存の子要素: なし");
   return lines.join("\n");
 }
 
-function callClaudeSuggest(contextText, extraHint){
+var AI_KIND_SYSTEM = {
+  issue: "あなたはコンサルティングファームのプリンシパルです。与えられた要素を、MECE（相互に重複せず、全体として漏れがない）な3〜5個のサブイシュー（検討すべき論点）に分解してください。分解にあたっては、顧客セグメント別・バリューチェーンの工程別・内部要因/外部要因別など、適切な切り口を選び、対象要素の範囲を過不足なくカバーするようにしてください。各要素は仮説や具体的な施策ではなく、あくまで『検討すべき問い』として表現してください。既存の子要素があればそれとも重複しないようにしてください。すべて日本語で、簡潔に（各20〜40文字程度）出力してください。すべての要素のkindは必ず\"issue\"としてください。",
+  hypothesis: "あなたはコンサルティングファームのプリンシパルです。与えられた要素について、互いに重複しない3〜5個の仮説（検証すべき仮説）を提示してください。それぞれ「〜ではないか」という検証可能で具体的な仮説として表現してください。既存の子要素があればそれとも重複しないようにしてください。すべて日本語で、簡潔に（各20〜40文字程度）出力してください。すべての要素のkindは必ず\"hypothesis\"としてください。",
+  action: "あなたはコンサルティングファームのプリンシパルです。与えられた要素について、互いに重複しない3〜5個のアクション（実行すべき具体的な施策）を提示してください。それぞれ動詞で始まる、実行可能で具体的な施策として表現してください。既存の子要素があればそれとも重複しないようにしてください。すべて日本語で、簡潔に（各20〜40文字程度）出力してください。すべての要素のkindは必ず\"action\"としてください。",
+  auto: "あなたはコンサルティングファームのプリンシパルとして、MECE（相互に重複せず、全体として漏れがない）なイシューツリーの分解を支援します。与えられた要素を3〜5個の下位要素に分解してください。下位要素どうしが重複しないようにし、既存の子要素があればそれとも重複しないようにしてください。各下位要素について、それが「イシュー」（検討すべき論点）、「仮説」（検証すべき仮説）、「アクション」（実行すべき具体的な施策）のいずれに最も近いかを判定してください。特にイシューに分類する場合は、MECE（相互排他的かつ網羅的）であることを強く意識し、切り口を明確にしてください。分類しにくい場合は\"none\"としてください。すべて日本語で、簡潔に（各20〜40文字程度）出力してください。"
+};
+
+function callClaudeSuggest(contextText, extraHint, forcedKind){
   var key = getApiKey();
   if(!key) return Promise.reject({code:"NO_KEY"});
-  var system = "あなたはコンサルティングファームのプリンシパルとして、MECE（相互に重複せず、全体として漏れがない）なイシューツリーの分解を支援します。与えられた要素を3〜5個の下位要素に分解してください。下位要素どうしが重複しないようにし、既存の子要素があればそれとも重複しないようにしてください。各下位要素について、それが「イシュー」（検討すべき論点）、「仮説」（検証すべき仮説）、「アクション」（実行すべき具体的な施策）のいずれに最も近いかを判定してください。分類しにくい場合は\"none\"としてください。すべて日本語で、簡潔に（各20〜40文字程度）出力してください。";
+  var system = AI_KIND_SYSTEM[forcedKind] || AI_KIND_SYSTEM.auto;
   var userText = contextText + (extraHint ? ("\n\n追加の指示: "+extraHint) : "");
   var schema = {
     type:"object",
@@ -844,7 +854,9 @@ function callClaudeSuggest(contextText, extraHint){
     if(!textBlock) return Promise.reject({code:"PARSE"});
     var parsed;
     try{ parsed = JSON.parse(textBlock.text); }catch(e){ return Promise.reject({code:"PARSE"}); }
-    return (parsed.suggestions||[]).filter(function(s){return s && s.text;});
+    var list = (parsed.suggestions||[]).filter(function(s){return s && s.text;});
+    if(forcedKind){ list = list.map(function(s){ return {text:s.text, kind:forcedKind}; }); }
+    return list;
   });
 }
 
@@ -882,26 +894,55 @@ function openAiSuggestModal(nodeId){
 function showAiInputStep(nodeId){
   var board=activeBoard();
   var node=board.nodes[nodeId];
+  var selectedKind = null;
   showModal({
     title:"AIで分解案を提案",
     body:function(wrap){
       var p=document.createElement("p");
       p.textContent = "対象: " + (node.text || "（未入力）");
       wrap.insertBefore(p, wrap.querySelector(".row-btns"));
+
+      var label=document.createElement("div");
+      label.textContent="生成する種類";
+      label.style.cssText="font-size:12px;color:var(--ink-soft);margin:-6px 0 6px;";
+      wrap.insertBefore(label, wrap.querySelector(".row-btns"));
+
+      var kindWrap=document.createElement("div");
+      kindWrap.className="kind-picker";
+      function buildKindFilterOpt(k, labelText){
+        var opt=document.createElement("button");
+        opt.type="button";
+        opt.className="kind-opt"+(k?" "+KIND_META[k].css:" kind-none")+(selectedKind===k?" active":"");
+        var sw=document.createElement("span");
+        sw.className="sw";
+        sw.style.background = k ? "var("+KIND_META[k].cssvar+")" : "var(--ink-faint)";
+        opt.appendChild(sw);
+        opt.appendChild(document.createTextNode(labelText));
+        opt.addEventListener("click", function(){
+          selectedKind = k;
+          Array.prototype.forEach.call(kindWrap.children, function(el){ el.classList.remove("active"); });
+          opt.classList.add("active");
+        });
+        return opt;
+      }
+      kindWrap.appendChild(buildKindFilterOpt(null, "自動（混在）"));
+      KIND_ORDER.forEach(function(k){ kindWrap.appendChild(buildKindFilterOpt(k, KIND_META[k].label)); });
+      wrap.insertBefore(kindWrap, wrap.querySelector(".row-btns"));
+
       var hintInput=document.createElement("input");
       hintInput.type="text";
       hintInput.placeholder="追加の指示（任意。例：〇〇業界に特化して）";
       wrap.insertBefore(hintInput, wrap.querySelector(".row-btns"));
       setTimeout(function(){hintInput.focus();},50);
-      return {getHint:function(){return hintInput.value.trim();}};
+      return {getHint:function(){return hintInput.value.trim();}, getKind:function(){return selectedKind;}};
     },
     buttons:[
       {label:"キャンセル", onClick:function(){closeModal();}},
-      {label:"提案を生成", cls:"primary", onClick:function(ctx){ showAiLoadingStep(nodeId, ctx.getHint()); }}
+      {label:"提案を生成", cls:"primary", onClick:function(ctx){ showAiLoadingStep(nodeId, ctx.getHint(), ctx.getKind()); }}
     ]
   });
 }
-function showAiLoadingStep(nodeId, hint){
+function showAiLoadingStep(nodeId, hint, forcedKind){
   showModal({
     title:"AIで分解案を提案",
     center:true,
@@ -915,16 +956,16 @@ function showAiLoadingStep(nodeId, hint){
   });
   var board=activeBoard();
   var contextText = buildAiContext(board, nodeId);
-  callClaudeSuggest(contextText, hint).then(function(list){
+  callClaudeSuggest(contextText, hint, forcedKind).then(function(list){
     if(!document.getElementById("modal")) return;
-    if(!list.length){ showAiErrorStep(nodeId, hint, "提案が得られませんでした。もう一度お試しください。"); return; }
+    if(!list.length){ showAiErrorStep(nodeId, hint, "提案が得られませんでした。もう一度お試しください。", forcedKind); return; }
     showAiResultsStep(nodeId, list);
   }, function(err){
     if(!document.getElementById("modal")) return;
-    showAiErrorStep(nodeId, hint, aiErrorMessage(err));
+    showAiErrorStep(nodeId, hint, aiErrorMessage(err), forcedKind);
   });
 }
-function showAiErrorStep(nodeId, hint, message){
+function showAiErrorStep(nodeId, hint, message, forcedKind){
   showModal({
     title:"AIで分解案を提案",
     center:true,
@@ -936,7 +977,7 @@ function showAiErrorStep(nodeId, hint, message){
     },
     buttons:[
       {label:"閉じる", onClick:function(){closeModal();}},
-      {label:"再試行", cls:"primary", onClick:function(){ showAiLoadingStep(nodeId, hint); }}
+      {label:"再試行", cls:"primary", onClick:function(){ showAiLoadingStep(nodeId, hint, forcedKind); }}
     ]
   });
 }
