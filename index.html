@@ -115,6 +115,8 @@
     background:transparent; color:var(--ink-soft); font-size:16px; display:flex; align-items:center; justify-content:center;
     cursor:pointer;
   }
+  .tab-add svg{width:16px;height:16px;}
+  .tab-add.connected{ border-style:solid; border-color:var(--accent); background:var(--accent); color:var(--accent-contrast); }
 
   /* ---------- Toolbar ---------- */
   #toolbar{
@@ -291,7 +293,7 @@
   }
   #modalBackdrop.center #modal{width:min(92vw,360px); border-radius:14px;}
   #modal h3{margin:0 0 12px; font-size:15px;}
-  #modal input[type=text]{
+  #modal input[type=text], #modal input[type=password], #modal input[type=email]{
     width:100%; padding:10px 12px; border:1px solid var(--line); border-radius:8px; background:var(--bg);
     color:var(--ink); font-size:14px; margin-bottom:14px;
   }
@@ -345,6 +347,7 @@
     <div id="boardTabs"></div>
     <button class="tab-add" id="addBoardBtn" title="新しいピラミッド">+</button>
     <button class="tab-add" id="apiKeyBtn" title="AI設定（APIキー）"></button>
+    <button class="tab-add" id="syncBtn" title="クラウド同期"></button>
   </header>
   <div id="toolbar">
     <div class="segmented" id="viewSwitch">
@@ -376,6 +379,7 @@
 
 <div id="toast"></div>
 
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.112.3" integrity="sha384-l8ah+VgaWtk1mvOe9VC+OirC6qHFF4yH7l7mKRidV9MSti3E9F463bMp6ZVN4kuC" crossorigin="anonymous"></script>
 <script>
 (function(){
 "use strict";
@@ -399,7 +403,8 @@ var ICONS = {
   tag:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12.6 3H6a2 2 0 0 0-2 2v6.6c0 .5.2 1 .6 1.4l9 9c.8.8 2 .8 2.8 0l6-6c.8-.8.8-2 0-2.8l-9-9c-.4-.4-.9-.6-1.4-.6Z"/><circle cx="8" cy="8" r="1.3" fill="currentColor" stroke="none"/></svg>',
   check:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12l5 5L20 6"/></svg>',
   sparkle:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v4M12 17v4M3 12h4M17 12h4M6 6l2.5 2.5M15.5 15.5 18 18M18 6l-2.5 2.5M8.5 15.5 6 18"/><circle cx="12" cy="12" r="2.4" fill="currentColor" stroke="none"/></svg>',
-  key:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="15" r="4"/><path d="M11 12l8-8M16 5l3 3M13 8l2.5 2.5"/></svg>'
+  key:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="15" r="4"/><path d="M11 12l8-8M16 5l3 3M13 8l2.5 2.5"/></svg>',
+  cloud:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M7 18h10.5a3.5 3.5 0 0 0 0-7 5.5 5.5 0 0 0-10.6-1.7A4 4 0 0 0 7 18Z"/></svg>'
 };
 
 var KIND_META = {
@@ -428,6 +433,23 @@ function setApiKey(key){
 function clearApiKey(){
   if(!storageOK) return;
   try{ localStorage.removeItem(API_KEY_STORAGE); }catch(e){}
+}
+
+var SUPA_CONFIG_STORAGE = "issue-pyramid-supabase-config";
+function getSupabaseConfig(){
+  if(!storageOK) return null;
+  try{
+    var raw = localStorage.getItem(SUPA_CONFIG_STORAGE);
+    return raw ? JSON.parse(raw) : null;
+  }catch(e){ return null; }
+}
+function setSupabaseConfig(url, anonKey){
+  if(!storageOK) return;
+  try{ localStorage.setItem(SUPA_CONFIG_STORAGE, JSON.stringify({url:url, anonKey:anonKey})); }catch(e){}
+}
+function clearSupabaseConfig(){
+  if(!storageOK) return;
+  try{ localStorage.removeItem(SUPA_CONFIG_STORAGE); }catch(e){}
 }
 
 function uid(){ return Math.random().toString(36).slice(2,10) + Date.now().toString(36).slice(-4); }
@@ -465,11 +487,13 @@ function load(){
 
 var saveTimer=null;
 function save(){
-  if(!storageOK) return;
-  clearTimeout(saveTimer);
-  saveTimer = setTimeout(function(){
-    try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }catch(e){}
-  }, 150);
+  if(storageOK){
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(function(){
+      try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }catch(e){}
+    }, 150);
+  }
+  pushStateToCloud();
 }
 
 function activeBoard(){
@@ -611,7 +635,8 @@ var els = {
   zoomOutBtn: document.getElementById("zoomOutBtn"),
   zoomResetBtn: document.getElementById("zoomResetBtn"),
   toast: document.getElementById("toast"),
-  apiKeyBtn: document.getElementById("apiKeyBtn")
+  apiKeyBtn: document.getElementById("apiKeyBtn"),
+  syncBtn: document.getElementById("syncBtn")
 };
 els.fab.innerHTML = ICONS.plus;
 els.linkModeBtn.innerHTML = ICONS.link;
@@ -620,6 +645,7 @@ els.zoomInBtn.innerHTML = ICONS.zoomIn;
 els.zoomOutBtn.innerHTML = ICONS.zoomOut;
 els.zoomResetBtn.innerHTML = ICONS.fit;
 els.apiKeyBtn.innerHTML = ICONS.key;
+els.syncBtn.innerHTML = ICONS.cloud;
 
 var currentView = "outline";
 var linkMode = false;
@@ -772,6 +798,335 @@ function openApiKeyModal(){
     })()
   });
 }
+
+/* ---------------- Cloud sync (Supabase, bring-your-own-project) ---------------- */
+var supabaseClient = null;
+var supabaseSession = null;
+var lastSyncedAt = null;
+var cloudSaveTimer = null;
+
+function supabaseAvailable(){ return typeof window.supabase !== "undefined"; }
+
+function ensureSupabaseClient(){
+  if(supabaseClient) return supabaseClient;
+  var cfg = getSupabaseConfig();
+  if(!cfg || !supabaseAvailable()) return null;
+  try{
+    supabaseClient = window.supabase.createClient(cfg.url, cfg.anonKey);
+  }catch(e){ supabaseClient = null; }
+  return supabaseClient;
+}
+
+function renderSyncIndicator(){
+  if(!els.syncBtn) return;
+  els.syncBtn.classList.toggle("connected", !!supabaseSession);
+}
+
+function formatDateTime(iso){
+  try{
+    var d = new Date(iso);
+    return d.toLocaleString("ja-JP", {year:"numeric", month:"2-digit", day:"2-digit", hour:"2-digit", minute:"2-digit"});
+  }catch(e){ return iso; }
+}
+
+function supabaseErrorMessage(err){
+  var msg = (err && err.message) || "";
+  if(/otp|token/i.test(msg) && /expired|invalid/i.test(msg)) return "コードが正しくないか、有効期限が切れています。もう一度お試しください。";
+  if(/rate limit/i.test(msg)) return "リクエストが多すぎます。しばらく待って再試行してください。";
+  if(/fetch/i.test(msg)) return "通信エラーが発生しました。接続設定（URL）を確認してください。";
+  return "エラーが発生しました。" + (msg ? ("（"+msg+"）") : "");
+}
+
+function pushStateToCloud(){
+  if(!supabaseSession) return;
+  clearTimeout(cloudSaveTimer);
+  cloudSaveTimer = setTimeout(pushStateToCloudImmediate, 800);
+}
+function pushStateToCloudImmediate(){
+  var client = ensureSupabaseClient();
+  if(!client || !supabaseSession) return;
+  client.from("user_state").upsert({
+    user_id: supabaseSession.user.id,
+    state: state,
+    updated_at: new Date().toISOString()
+  }).then(function(res){
+    if(!res.error){ lastSyncedAt = new Date(); renderSyncIndicator(); }
+  });
+}
+
+function openSyncModal(){
+  var cfg = getSupabaseConfig();
+  if(!supabaseAvailable()){
+    showModal({
+      title:"クラウド同期",
+      center:true,
+      body:function(wrap){
+        var p=document.createElement("p");
+        p.textContent="この環境ではクラウド同期を利用できません（外部サーバーへの通信が制限されています）。GitHub Pages版の https://dev-sourin.github.io/issue-pyramid/ からお試しください。";
+        wrap.insertBefore(p, wrap.querySelector(".row-btns"));
+        return {};
+      },
+      buttons:[{label:"閉じる", onClick:function(){closeModal();}}]
+    });
+    return;
+  }
+  if(!cfg){ showSupabaseConfigStep(); return; }
+  var client = ensureSupabaseClient();
+  if(!client){ showSupabaseConfigStep(); return; }
+  showSyncLoadingStep("確認中…");
+  client.auth.getSession().then(function(res){
+    if(!document.getElementById("modal")) return;
+    supabaseSession = (res.data && res.data.session) || null;
+    renderSyncIndicator();
+    if(supabaseSession){ showSupabaseAccountStep(); } else { showSupabaseLoginStep(); }
+  }, function(err){
+    if(!document.getElementById("modal")) return;
+    showSyncErrorStep(supabaseErrorMessage(err), function(){ showSupabaseConfigStep(); });
+  });
+}
+
+function showSupabaseConfigStep(){
+  var existing = getSupabaseConfig();
+  showModal({
+    title:"クラウド同期の接続設定",
+    body:function(wrap){
+      var p=document.createElement("p");
+      p.textContent="Supabaseプロジェクトの Project URL と anon public key を入力してください。値はこの端末のブラウザにのみ保存されます。";
+      wrap.insertBefore(p, wrap.querySelector(".row-btns"));
+      var urlInput=document.createElement("input");
+      urlInput.type="text"; urlInput.placeholder="Project URL（例: https://xxxx.supabase.co）";
+      urlInput.value = existing ? existing.url : "";
+      wrap.insertBefore(urlInput, wrap.querySelector(".row-btns"));
+      var keyInput=document.createElement("input");
+      keyInput.type="password"; keyInput.placeholder="anon public key";
+      keyInput.value = existing ? existing.anonKey : "";
+      keyInput.style.marginTop="8px";
+      wrap.insertBefore(keyInput, wrap.querySelector(".row-btns"));
+      setTimeout(function(){urlInput.focus();},50);
+      return {getUrl:function(){return urlInput.value.trim();}, getKey:function(){return keyInput.value.trim();}};
+    },
+    buttons:(function(){
+      var arr=[{label:"キャンセル", onClick:function(){closeModal();}}];
+      if(existing){
+        arr.push({label:"接続解除", cls:"danger", onClick:function(){
+          if(supabaseClient) { try{ supabaseClient.auth.signOut(); }catch(e){} }
+          clearSupabaseConfig();
+          supabaseClient=null; supabaseSession=null;
+          closeModal(); renderSyncIndicator();
+          toast("クラウド同期の接続を解除しました");
+        }});
+      }
+      arr.push({label:"保存して次へ", cls:"primary", onClick:function(ctx){
+        var u=ctx.getUrl(), k=ctx.getKey();
+        if(!u || !k){ toast("URLとキーを入力してください"); return; }
+        setSupabaseConfig(u,k);
+        supabaseClient=null;
+        var client = ensureSupabaseClient();
+        if(!client){ toast("接続に失敗しました"); return; }
+        closeModal();
+        openSyncModal();
+      }});
+      return arr;
+    })()
+  });
+}
+
+function showSupabaseLoginStep(){
+  showModal({
+    title:"クラウド同期にログイン",
+    body:function(wrap){
+      var p=document.createElement("p");
+      p.textContent="メールアドレスを入力すると、確認コードが送信されます。";
+      wrap.insertBefore(p, wrap.querySelector(".row-btns"));
+      var emailInput=document.createElement("input");
+      emailInput.type="email"; emailInput.placeholder="you@example.com";
+      wrap.insertBefore(emailInput, wrap.querySelector(".row-btns"));
+      setTimeout(function(){emailInput.focus();},50);
+      var linkBtn=document.createElement("button");
+      linkBtn.type="button";
+      linkBtn.textContent="接続設定を変更";
+      linkBtn.style.cssText="background:none;border:none;color:var(--accent);font-size:12.5px;padding:6px 0 0;cursor:pointer;display:block;";
+      linkBtn.addEventListener("click", function(){ closeModal(); showSupabaseConfigStep(); });
+      wrap.insertBefore(linkBtn, wrap.querySelector(".row-btns"));
+      return {getEmail:function(){return emailInput.value.trim();}};
+    },
+    buttons:[
+      {label:"キャンセル", onClick:function(){closeModal();}},
+      {label:"コードを送信", cls:"primary", onClick:function(ctx){
+        var email=ctx.getEmail();
+        if(!email){ toast("メールアドレスを入力してください"); return; }
+        var client=ensureSupabaseClient();
+        showSyncLoadingStep("送信中…");
+        client.auth.signInWithOtp({email:email}).then(function(res){
+          if(!document.getElementById("modal")) return;
+          if(res.error){ showSyncErrorStep(supabaseErrorMessage(res.error), function(){ showSupabaseLoginStep(); }); return; }
+          showSupabaseCodeStep(email);
+        }, function(err){
+          if(!document.getElementById("modal")) return;
+          showSyncErrorStep(supabaseErrorMessage(err), function(){ showSupabaseLoginStep(); });
+        });
+      }}
+    ]
+  });
+}
+
+function showSupabaseCodeStep(email){
+  showModal({
+    title:"確認コードを入力",
+    body:function(wrap){
+      var p=document.createElement("p");
+      p.textContent = email + " に届いた確認コードを入力してください。";
+      wrap.insertBefore(p, wrap.querySelector(".row-btns"));
+      var codeInput=document.createElement("input");
+      codeInput.type="text"; codeInput.inputMode="numeric"; codeInput.placeholder="123456";
+      wrap.insertBefore(codeInput, wrap.querySelector(".row-btns"));
+      setTimeout(function(){codeInput.focus();},50);
+      return {getCode:function(){return codeInput.value.trim();}};
+    },
+    buttons:[
+      {label:"キャンセル", onClick:function(){closeModal();}},
+      {label:"ログイン", cls:"primary", onClick:function(ctx){
+        var code=ctx.getCode();
+        if(!code){ toast("コードを入力してください"); return; }
+        var client=ensureSupabaseClient();
+        showSyncLoadingStep("確認中…");
+        client.auth.verifyOtp({email:email, token:code, type:"email"}).then(function(res){
+          if(!document.getElementById("modal")) return;
+          if(res.error){ showSyncErrorStep(supabaseErrorMessage(res.error), function(){ showSupabaseCodeStep(email); }); return; }
+          supabaseSession = (res.data && res.data.session) || null;
+          renderSyncIndicator();
+          resolveCloudConflict();
+        }, function(err){
+          if(!document.getElementById("modal")) return;
+          showSyncErrorStep(supabaseErrorMessage(err), function(){ showSupabaseCodeStep(email); });
+        });
+      }}
+    ]
+  });
+}
+
+function resolveCloudConflict(){
+  var client = ensureSupabaseClient();
+  showSyncLoadingStep("クラウドのデータを確認中…");
+  client.from("user_state").select("state, updated_at").eq("user_id", supabaseSession.user.id).maybeSingle().then(function(res){
+    if(!document.getElementById("modal")) return;
+    if(res.error){ showSyncErrorStep(supabaseErrorMessage(res.error), function(){ showSupabaseAccountStep(); }); return; }
+    if(!res.data){
+      pushStateToCloudImmediate();
+      closeModal();
+      toast("ログインしました。この端末のデータをクラウドに保存しました。");
+      return;
+    }
+    showCloudConflictStep(res.data.state, res.data.updated_at);
+  }, function(err){
+    if(!document.getElementById("modal")) return;
+    showSyncErrorStep(supabaseErrorMessage(err), function(){ resolveCloudConflict(); });
+  });
+}
+
+function showCloudConflictStep(cloudState, updatedAt){
+  showModal({
+    title:"データの選択",
+    center:true,
+    body:function(wrap){
+      var p=document.createElement("p");
+      p.textContent = "クラウドに保存されたデータが見つかりました（最終更新: "+formatDateTime(updatedAt)+"）。どちらのデータを使用しますか？";
+      wrap.insertBefore(p, wrap.querySelector(".row-btns"));
+      return {};
+    },
+    buttons:[
+      {label:"この端末のデータを使う", onClick:function(){
+        pushStateToCloudImmediate();
+        closeModal();
+        toast("この端末のデータでクラウドを上書きしました");
+      }},
+      {label:"クラウドのデータを使う", cls:"primary", onClick:function(){
+        state = cloudState;
+        if(!state.viewByBoard) state.viewByBoard = {};
+        if(!state.compareIds) state.compareIds = [];
+        render();
+        closeModal();
+        toast("クラウドのデータを読み込みました");
+      }}
+    ]
+  });
+}
+
+function showSupabaseAccountStep(){
+  var email = supabaseSession && supabaseSession.user && supabaseSession.user.email;
+  showModal({
+    title:"クラウド同期",
+    body:function(wrap){
+      var p=document.createElement("p");
+      p.textContent = "ログイン中: " + (email || "");
+      wrap.insertBefore(p, wrap.querySelector(".row-btns"));
+      var p2=document.createElement("p");
+      p2.textContent = lastSyncedAt ? ("最終同期: "+formatDateTime(lastSyncedAt.toISOString())) : "この端末での同期はまだ実行されていません。";
+      p2.style.cssText="margin-top:-10px;";
+      wrap.insertBefore(p2, wrap.querySelector(".row-btns"));
+      return {};
+    },
+    buttons:[
+      {label:"閉じる", onClick:function(){closeModal();}},
+      {label:"ログアウト", cls:"danger", onClick:function(){
+        var client=ensureSupabaseClient();
+        if(client){ client.auth.signOut(); }
+        supabaseSession=null; renderSyncIndicator();
+        closeModal(); toast("ログアウトしました");
+      }},
+      {label:"今すぐ同期", cls:"primary", onClick:function(){
+        pushStateToCloudImmediate();
+        toast("同期しました");
+      }}
+    ]
+  });
+}
+
+function showSyncLoadingStep(msg){
+  showModal({
+    title:"クラウド同期",
+    center:true,
+    body:function(wrap){
+      var p=document.createElement("p");
+      p.textContent=msg;
+      wrap.insertBefore(p, wrap.querySelector(".row-btns"));
+      return {};
+    },
+    buttons:[]
+  });
+}
+function showSyncErrorStep(message, retryFn){
+  showModal({
+    title:"クラウド同期",
+    center:true,
+    body:function(wrap){
+      var p=document.createElement("p");
+      p.textContent=message;
+      wrap.insertBefore(p, wrap.querySelector(".row-btns"));
+      return {};
+    },
+    buttons:[
+      {label:"閉じる", onClick:function(){closeModal();}},
+      {label:"再試行", cls:"primary", onClick:function(){ closeModal(); retryFn(); }}
+    ]
+  });
+}
+
+els.syncBtn.addEventListener("click", openSyncModal);
+(function initCloudSync(){
+  var cfg = getSupabaseConfig();
+  if(!cfg || !supabaseAvailable()) return;
+  var client = ensureSupabaseClient();
+  if(!client) return;
+  client.auth.getSession().then(function(res){
+    supabaseSession = (res.data && res.data.session) || null;
+    renderSyncIndicator();
+  });
+  client.auth.onAuthStateChange(function(event, session){
+    supabaseSession = session;
+    renderSyncIndicator();
+  });
+})();
 
 /* ---------------- AI decomposition suggestions ---------------- */
 function buildAiContext(board, nodeId){
