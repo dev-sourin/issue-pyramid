@@ -384,6 +384,21 @@
 (function(){
 "use strict";
 
+var magicLinkRedirectDetected = /access_token=|type=magiclink|type=recovery/.test(window.location.hash);
+var magicLinkErrorMessage = null;
+if(/error=/.test(window.location.hash)){
+  var __errCodeMatch = window.location.hash.match(/error_code=([^&]+)/);
+  var __errCode = __errCodeMatch ? __errCodeMatch[1] : "";
+  if(/otp_expired/.test(__errCode)){
+    magicLinkErrorMessage = "ログインリンクの有効期限が切れています。もう一度送信してください。";
+  } else if(/access_denied/.test(__errCode)){
+    magicLinkErrorMessage = "このログインリンクは無効です（すでに使用済みか、無効化されています）。もう一度送信してください。";
+  } else {
+    var __errMatch = window.location.hash.match(/error_description=([^&]+)/);
+    magicLinkErrorMessage = __errMatch ? decodeURIComponent(__errMatch[1].replace(/\+/g," ")) : "ログインリンクが無効か、有効期限が切れています。";
+  }
+}
+
 var ICONS = {
   plus:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>',
   trash:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M9 7V4.5A1.5 1.5 0 0 1 10.5 3h3A1.5 1.5 0 0 1 15 4.5V7M6 7l1 13a2 2 0 0 0 2 1.9h6a2 2 0 0 0 2-1.9l1-13"/></svg>',
@@ -936,7 +951,7 @@ function showSupabaseLoginStep(){
     title:"クラウド同期にログイン",
     body:function(wrap){
       var p=document.createElement("p");
-      p.textContent="メールアドレスを入力すると、確認コードが送信されます。";
+      p.textContent="メールアドレスを入力すると、ログイン用のリンクが送信されます。届いたメール内のリンクを、ログインしたい端末で開いてください。";
       wrap.insertBefore(p, wrap.querySelector(".row-btns"));
       var emailInput=document.createElement("input");
       emailInput.type="email"; emailInput.placeholder="you@example.com";
@@ -952,15 +967,16 @@ function showSupabaseLoginStep(){
     },
     buttons:[
       {label:"キャンセル", onClick:function(){closeModal();}},
-      {label:"コードを送信", cls:"primary", onClick:function(ctx){
+      {label:"ログインリンクを送信", cls:"primary", onClick:function(ctx){
         var email=ctx.getEmail();
         if(!email){ toast("メールアドレスを入力してください"); return; }
         var client=ensureSupabaseClient();
         showSyncLoadingStep("送信中…");
-        client.auth.signInWithOtp({email:email}).then(function(res){
+        var redirectTo = window.location.origin + window.location.pathname;
+        client.auth.signInWithOtp({email:email, options:{emailRedirectTo:redirectTo}}).then(function(res){
           if(!document.getElementById("modal")) return;
           if(res.error){ showSyncErrorStep(supabaseErrorMessage(res.error), function(){ showSupabaseLoginStep(); }); return; }
-          showSupabaseCodeStep(email);
+          showSupabaseLinkSentStep(email);
         }, function(err){
           if(!document.getElementById("modal")) return;
           showSyncErrorStep(supabaseErrorMessage(err), function(){ showSupabaseLoginStep(); });
@@ -970,38 +986,17 @@ function showSupabaseLoginStep(){
   });
 }
 
-function showSupabaseCodeStep(email){
+function showSupabaseLinkSentStep(email){
   showModal({
-    title:"確認コードを入力",
+    title:"メールを確認してください",
+    center:true,
     body:function(wrap){
       var p=document.createElement("p");
-      p.textContent = email + " に届いた確認コードを入力してください。";
+      p.textContent = email + " にログインリンクを送信しました。ログインしたい端末でそのメールを開き、リンクをタップ／クリックしてください。このアプリのタブに戻ってくると、自動的にログインが完了します。";
       wrap.insertBefore(p, wrap.querySelector(".row-btns"));
-      var codeInput=document.createElement("input");
-      codeInput.type="text"; codeInput.inputMode="numeric"; codeInput.placeholder="123456";
-      wrap.insertBefore(codeInput, wrap.querySelector(".row-btns"));
-      setTimeout(function(){codeInput.focus();},50);
-      return {getCode:function(){return codeInput.value.trim();}};
+      return {};
     },
-    buttons:[
-      {label:"キャンセル", onClick:function(){closeModal();}},
-      {label:"ログイン", cls:"primary", onClick:function(ctx){
-        var code=ctx.getCode();
-        if(!code){ toast("コードを入力してください"); return; }
-        var client=ensureSupabaseClient();
-        showSyncLoadingStep("確認中…");
-        client.auth.verifyOtp({email:email, token:code, type:"email"}).then(function(res){
-          if(!document.getElementById("modal")) return;
-          if(res.error){ showSyncErrorStep(supabaseErrorMessage(res.error), function(){ showSupabaseCodeStep(email); }); return; }
-          supabaseSession = (res.data && res.data.session) || null;
-          renderSyncIndicator();
-          resolveCloudConflict();
-        }, function(err){
-          if(!document.getElementById("modal")) return;
-          showSyncErrorStep(supabaseErrorMessage(err), function(){ showSupabaseCodeStep(email); });
-        });
-      }}
-    ]
+    buttons:[{label:"閉じる", onClick:function(){closeModal();}}]
   });
 }
 
@@ -1118,15 +1113,24 @@ els.syncBtn.addEventListener("click", openSyncModal);
   if(!cfg || !supabaseAvailable()) return;
   var client = ensureSupabaseClient();
   if(!client) return;
-  client.auth.getSession().then(function(res){
-    supabaseSession = (res.data && res.data.session) || null;
+  function handleSession(session){
+    var isFreshMagicLinkSignIn = magicLinkRedirectDetected && !supabaseSession && session;
+    if(isFreshMagicLinkSignIn) magicLinkRedirectDetected = false;
+    supabaseSession = session || null;
     renderSyncIndicator();
+    if(isFreshMagicLinkSignIn) resolveCloudConflict();
+  }
+  client.auth.getSession().then(function(res){
+    handleSession((res.data && res.data.session) || null);
   });
   client.auth.onAuthStateChange(function(event, session){
-    supabaseSession = session;
-    renderSyncIndicator();
+    handleSession(session);
   });
 })();
+
+if(magicLinkErrorMessage && getSupabaseConfig()){
+  showSyncErrorStep(magicLinkErrorMessage, function(){ showSupabaseLoginStep(); });
+}
 
 /* ---------------- AI decomposition suggestions ---------------- */
 function buildAiContext(board, nodeId){
